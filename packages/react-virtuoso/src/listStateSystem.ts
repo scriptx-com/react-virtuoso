@@ -181,7 +181,7 @@ export const listStateSystem = u.system(
     { data, firstItemIndex, gap, sizes, totalCount },
     groupedListSystem,
     { listBoundary, topListHeight: rangeTopListHeight, visibleRange },
-    { initialTopMostItemIndex, scrolledToInitialItem },
+    { initialItemFinalLocationReached, initialTopMostItemIndex, scrolledToInitialItem },
     { topListHeight },
     stateFlags,
     { didMount },
@@ -208,7 +208,8 @@ export const listStateSystem = u.system(
           u.duc(firstItemIndex),
           u.duc(gap),
           u.duc(minOverscanItemCount),
-          data
+          data,
+          initialItemFinalLocationReached
         ),
         u.filter(([mount, recalcInProgress, , totalCount, , , , , , , , data]) => {
           // When data length changes, it is synced to totalCount, both of which trigger a recalc separately.
@@ -230,6 +231,7 @@ export const listStateSystem = u.system(
             gap,
             minOverscanItemCountValue,
             data,
+            initialItemFinalLocationReached,
           ]) => {
             const sizesValue = sizes
             const { offsetTree, sizeTree } = sizesValue
@@ -294,20 +296,25 @@ export const listStateSystem = u.system(
               }
             }
 
-            // If the list hasn't scrolled to the initial item because the initial item was set,
-            // render the target probe item rather than an empty list. The container is
-            // visibility:hidden until `initialItemFinalLocationReached` flips, so the user
-            // doesn't see the probe item at the wrong scroll position — but emitting it keeps
-            // the target cell mounted across the scroll-to-initial transition. With an empty
-            // list, React unmounts every visible cell, throwing away focus/refs/animation
-            // state on whichever cell was previously rendered (e.g. via the sizeTree-empty
-            // probe branch above). Reusing the same `probeItemSet` call mirrors that branch
-            // and the post-scroll windowed listState re-emits cells with stable computeItemKey,
-            // so React preserves the target cell's DOM node across the transition.
+            // If the list hasn't fully scrolled to the initial item yet, render the target
+            // probe item rather than an empty list (or a transient windowed view).
+            //
+            // The container is visibility:hidden until `initialItemFinalLocationReached`
+            // flips true, so the user never sees the probe item at the wrong scroll
+            // position — but emitting it keeps the target cell mounted across the
+            // entire scroll-to-initial transition. Critically, we gate on
+            // `initialItemFinalLocationReached` (which flips only when the scroll
+            // *completes*) rather than `scrolledToInitialItem` (which flips on the
+            // *first* scrollTop change, well before arrival): between those two
+            // moments virtuoso emits windowed listStates based on intermediate
+            // scrollTop values that may not include the target's index, which would
+            // unmount the focused cell. With `!initialItemFinalLocationReached` we
+            // hold the probe item across the whole scroll, then the final windowed
+            // emission preserves the target cell via stable computeItemKey.
             //
             // This is a condition to be evaluated after the probe check cycle, do not merge
             // with the totalCount check above
-            if (!scrolledToInitialItem) {
+            if (!initialItemFinalLocationReached) {
               return buildListState(
                 probeItemSet(getInitialTopMostItemIndexNumber(initialTopMostItemIndex, totalCount), sizesValue, data),
                 topItems,
