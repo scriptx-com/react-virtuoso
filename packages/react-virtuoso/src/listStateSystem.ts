@@ -280,12 +280,27 @@ export const listStateSystem = u.system(
             }
 
             // If the list hasn't scrolled to the initial item because the initial item was set,
-            // render empty list.
+            // render the target probe item rather than an empty list. The container is
+            // visibility:hidden until `initialItemFinalLocationReached` flips, so the user
+            // doesn't see the probe item at the wrong scroll position — but emitting it keeps
+            // the target cell mounted across the scroll-to-initial transition. With an empty
+            // list, React unmounts every visible cell, throwing away focus/refs/animation
+            // state on whichever cell was previously rendered (e.g. via the sizeTree-empty
+            // probe branch above). Reusing the same `probeItemSet` call mirrors that branch
+            // and the post-scroll windowed listState re-emits cells with stable computeItemKey,
+            // so React preserves the target cell's DOM node across the transition.
             //
             // This is a condition to be evaluated after the probe check cycle, do not merge
             // with the totalCount check above
             if (!scrolledToInitialItem) {
-              return buildListState([], topItems, totalCount, gap, sizesValue, firstItemIndex)
+              return buildListState(
+                probeItemSet(getInitialTopMostItemIndexNumber(initialTopMostItemIndex, totalCount), sizesValue, data),
+                topItems,
+                totalCount,
+                gap,
+                sizesValue,
+                firstItemIndex
+              )
             }
 
             const minStartIndex = topItemsIndexes.length > 0 ? topItemsIndexes[topItemsIndexes.length - 1]! + 1 : 0
