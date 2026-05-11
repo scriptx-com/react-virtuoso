@@ -296,25 +296,27 @@ export const listStateSystem = u.system(
               }
             }
 
-            // If the list hasn't fully scrolled to the initial item yet, render the target
-            // probe item rather than an empty list (or a transient windowed view).
+            // If the list hasn't scrolled to the initial item yet (no measurements
+            // available to compute a sensible window), render the target probe item
+            // rather than an empty list. Without this, React would unmount any
+            // previously-mounted cell — including the focused one — across this
+            // transitional state.
             //
-            // The container is visibility:hidden until `initialItemFinalLocationReached`
-            // flips true, so the user never sees the probe item at the wrong scroll
-            // position — but emitting it keeps the target cell mounted across the
-            // entire scroll-to-initial transition. Critically, we gate on
-            // `initialItemFinalLocationReached` (which flips only when the scroll
-            // *completes*) rather than `scrolledToInitialItem` (which flips on the
-            // *first* scrollTop change, well before arrival): between those two
-            // moments virtuoso emits windowed listStates based on intermediate
-            // scrollTop values that may not include the target's index, which would
-            // unmount the focused cell. With `!initialItemFinalLocationReached` we
-            // hold the probe item across the whole scroll, then the final windowed
-            // emission preserves the target cell via stable computeItemKey.
+            // Note we gate on `scrolledToInitialItem` (which flips on the first
+            // scrollTop write) and NOT `initialItemFinalLocationReached`. Holding
+            // only the probe across the whole scroll prevents measurements from
+            // propagating to surrounding items, which would leave virtuoso's
+            // scroll-to-index target computed against `defaultItemSize` — the
+            // scroll never converges, `scrollTargetReached` never fires, and the
+            // container (visibility:hidden until `initialItemFinalLocationReached`
+            // flips) stays hidden forever.
             //
-            // This is a condition to be evaluated after the probe check cycle, do not merge
-            // with the totalCount check above
-            if (!initialItemFinalLocationReached) {
+            // Target-cell preservation across the rest of the transition (i.e.
+            // transient windowed emissions that drop the target between scroll
+            // retries) is handled at the end of this map function — see the
+            // "ensure target stays in window" block before the final
+            // `buildListState` return.
+            if (!scrolledToInitialItem) {
               return buildListState(
                 probeItemSet(getInitialTopMostItemIndexNumber(initialTopMostItemIndex, totalCount), sizesValue, data),
                 topItems,
@@ -397,6 +399,37 @@ export const listStateSystem = u.system(
                   items.push({ data: data?.[i], index: i, offset, size })
                   offset += size + gap
                 }
+              }
+            }
+
+            // Ensure target stays in window during the scroll-to-initial transition.
+            //
+            // Between scroll retries (see scrollToIndexSystem's listRefresh →
+            // watchChangesFor(150) → retry loop), virtuoso emits windowed listStates
+            // computed from intermediate `[startOffset, endOffset]` values that can
+            // exclude the target item entirely — e.g. scroll retry recomputes against
+            // a stale visibleRange [0, viewportHeight] and the window collapses to
+            // items 0..N where N < targetIndex. React then unmounts the target cell
+            // on that transient emission and re-mounts a fresh one on the next,
+            // destroying focus / refs / animation state.
+            //
+            // Until `initialItemFinalLocationReached` flips true (the scroll truly
+            // settles), inject the target index into the items array whenever the
+            // windowed math drops it. The container is visibility:hidden during this
+            // window, so the placeholder offset is never visible to the user. The
+            // next emission carries the correct offset and React reconciles via the
+            // stable computeItemKey.
+            if (!initialItemFinalLocationReached) {
+              const totalCountNum = totalCount as number
+              const targetIndex = getInitialTopMostItemIndexNumber(initialTopMostItemIndex, totalCountNum)
+              if (targetIndex >= 0 && targetIndex < totalCountNum && !items.some((it) => it.index === targetIndex)) {
+                const targetSizeRange = rangesWithin(sizeTree, targetIndex, targetIndex)
+                items.push({
+                  data: (data as readonly unknown[] | undefined)?.[targetIndex],
+                  index: targetIndex,
+                  offset: 0,
+                  size: (targetSizeRange[0]?.value as number | undefined) ?? 0,
+                })
               }
             }
 
