@@ -2,21 +2,27 @@ packages:
   - 'packages/*'
   - 'apps/*'
   - 'examples'
-
-strictPeerDependencies: false
+allowBuilds:
+  '@swc/core': true
+  esbuild: true
+  lefthook: true
+  msw: true
+  sharp: true
 
 catalog:
+  '@types/node': ^22.19.1
+  '@types/react': ^19.2.7
+  '@types/react-dom': ^19.2.3
+  '@vitejs/plugin-react': ^4.7.0
+  '@vitest/browser': ^4.0.16
+  '@vitest/browser-playwright': ^4.0.16
+  playwright: ^1.58.2
+  react: ^19.2.3
+  react-dom: ^19.2.3
   typescript: ^5.9.3
 
   vite: ^6.4.1
-  react: ^19.2.3
-  react-dom: ^19.2.3
-  '@types/react': ^19.2.7
-  '@types/react-dom': ^19.2.3
-  '@types/node': ^22.19.1
-  vitest: ^4.0.16
-  '@vitejs/plugin-react': ^4.7.0
   vite-plugin-dts: ^4.5.4
-  playwright: ^1.58.2
-  '@vitest/browser': ^4.0.16
-  '@vitest/browser-playwright': ^4.0.16
+  vitest: ^4.0.16
+
+strictPeerDependencies: false
