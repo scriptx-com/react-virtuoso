@@ -242,7 +242,22 @@ export const listStateSystem = u.system(
             // no container measruements yet
             if (startOffset === 0 && endOffset === 0) {
               if (initialItemCountValue === 0) {
-                return { ...EMPTY_LIST_STATE, totalCount }
+                // Same rationale as the `!scrolledToInitialItem` branch below:
+                // emit the target probe item rather than an empty list, so any
+                // cell rendered in the prior emission (e.g. via the
+                // sizeTree-empty probe branch) stays mounted across this
+                // transitional state and React preserves focus/refs/animations
+                // on it. The container is visibility:hidden until
+                // `initialItemFinalLocationReached` flips, so the user doesn't
+                // see the probe item.
+                return buildListState(
+                  probeItemSet(getInitialTopMostItemIndexNumber(initialTopMostItemIndex, totalCount), sizesValue, data),
+                  [],
+                  totalCount,
+                  gap,
+                  sizesValue,
+                  firstItemIndex
+                )
               }
               return buildListStateFromItemCount(initialItemCountValue, initialTopMostItemIndex, sizes, firstItemIndex, gap, data || [])
             }
