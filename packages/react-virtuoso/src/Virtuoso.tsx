@@ -128,9 +128,21 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
           ? {
               display: 'inline-block',
               height: '100%',
-              marginInlineStart: deviation !== 0 ? deviation : alignToBottom ? 'auto' : 0,
-              paddingInlineEnd: listState.offsetBottom,
-              paddingInlineStart: listState.offsetTop,
+              // Use physical properties (marginLeft / paddingLeft / paddingRight)
+              // instead of CSS logical properties (marginInlineStart /
+              // paddingInlineStart / paddingInlineEnd). The logical-property
+              // family for inline-axis ships in Chromium 87+; Tizen 5.x runs on
+              // Chromium 63 and silently drops these declarations, leaving the
+              // horizontal scroller without the phantom padding that represents
+              // unrendered items beyond the viewport. scrollWidth then stays at
+              // the natural width of the currently-rendered cells, so
+              // scrollToIndex / scrollTo clamp and the list cannot advance past
+              // the initially measured range. Physical properties produce the
+              // same layout in LTR (which is the only writing mode this fork
+              // targets) and work on every Chromium version.
+              marginLeft: deviation !== 0 ? deviation : alignToBottom ? 'auto' : 0,
+              paddingRight: listState.offsetBottom,
+              paddingLeft: listState.offsetTop,
               whiteSpace: 'nowrap',
             }
           : {
