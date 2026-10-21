@@ -109,7 +109,8 @@ export function createCellSizeObserver({
           previous.cell.index === cell.index &&
           previous.cell.logicalKey === cell.logicalKey &&
           previous.cell.assignmentGeneration === cell.assignmentGeneration &&
-          previous.cell.layoutRevision === cell.layoutRevision
+          previous.cell.layoutRevision === cell.layoutRevision &&
+          previous.size === cell.knownSize
         ) {
           continue
         }
