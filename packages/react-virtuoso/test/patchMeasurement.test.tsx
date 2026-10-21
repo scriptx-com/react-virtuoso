@@ -133,3 +133,16 @@ it('continues publishing real item measurements after content changes', async ()
   await act(async () => observer.notify(list))
   expect(container.querySelector('[data-index="0"]')?.getAttribute('data-known-size')).toBe('42')
 })
+
+it('ignores a queued notification from a replaced observer callback', async () => {
+  const oldReader = vi.fn(() => 100)
+  const newReader = vi.fn(() => 120)
+  await renderList({ itemSize: oldReader, skipAnimationFrameInResizeObserver: true })
+  const list = container.querySelector('[data-testid="virtuoso-item-list"]')! as HTMLElement
+  list.style.rowGap = '0px'
+  Object.defineProperty(list, 'offsetParent', { value: list.parentElement })
+  const oldObserver = observers.find((candidate) => candidate.nodes.has(list))!
+  await renderList({ itemSize: newReader, skipAnimationFrameInResizeObserver: true })
+  await act(async () => oldObserver.notify(list))
+  expect(oldReader).not.toHaveBeenCalled()
+})

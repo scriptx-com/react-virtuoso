@@ -1,11 +1,13 @@
 import React from 'react'
 
 import { LogLevel } from '../loggerSystem'
+import { knownSizeAt } from '../recycling/layout'
 import { getLogicalScrollLeft } from '../utils/horizontalScroll'
 import { useSizeWithElRef } from './useSize'
 
 import type { ScrollContainerState, SizeFunction, SizeRange } from '../interfaces'
 import type { Log } from '../loggerSystem'
+import type { KnownLayout } from '../recycling/layout'
 export default function useChangedListContentsSizes(
   callback: (ranges: SizeRange[]) => void,
   itemSize: SizeFunction,
@@ -15,11 +17,15 @@ export default function useChangedListContentsSizes(
   gap: ((gap: number) => void) | undefined,
   customScrollParent: HTMLElement | undefined,
   horizontalDirection: boolean,
-  skipAnimationFrame: boolean
+  skipAnimationFrame: boolean,
+  knownLayout?: KnownLayout,
+  allItemsKnown = false
 ) {
   const memoedCallback = React.useCallback(
     (el: HTMLElement) => {
-      const ranges = getChangedChildSizes(el.children, itemSize, horizontalDirection ? 'offsetWidth' : 'offsetHeight', log)
+      const ranges = allItemsKnown
+        ? null
+        : getChangedChildSizes(el.children, itemSize, horizontalDirection ? 'offsetWidth' : 'offsetHeight', log, knownLayout)
       let scrollableElement = el.parentElement!
 
       while (scrollableElement.dataset.virtuosoScroller === undefined) {
@@ -88,13 +94,19 @@ export default function useChangedListContentsSizes(
         callback(ranges)
       }
     },
-    [callback, itemSize, log, gap, customScrollParent, scrollContainerStateCallback, horizontalDirection]
+    [callback, itemSize, log, gap, customScrollParent, scrollContainerStateCallback, horizontalDirection, knownLayout, allItemsKnown]
   )
 
   return useSizeWithElRef(memoedCallback, enabled, skipAnimationFrame)
 }
 
-function getChangedChildSizes(children: HTMLCollection, itemSize: SizeFunction, field: 'offsetHeight' | 'offsetWidth', log: Log) {
+export function getChangedChildSizes(
+  children: HTMLCollection,
+  itemSize: SizeFunction,
+  field: 'offsetHeight' | 'offsetWidth',
+  log: Log,
+  knownLayout?: KnownLayout
+) {
   const length = children.length
 
   if (length === 0) {
@@ -111,6 +123,9 @@ function getChangedChildSizes(children: HTMLCollection, itemSize: SizeFunction, 
     }
 
     const index = parseInt(child.dataset.index)
+    if (knownSizeAt(knownLayout, index) !== undefined) {
+      continue
+    }
     const knownSize = parseFloat(child.dataset.knownSize!)
     const size = itemSize(child, field)
 
@@ -130,7 +145,7 @@ function getChangedChildSizes(children: HTMLCollection, itemSize: SizeFunction, 
     }
   }
 
-  return results
+  return results.length ? results : null
 }
 
 function resolveGapValue(property: string, value: string | undefined, log: Log) {

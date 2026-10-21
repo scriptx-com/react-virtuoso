@@ -7,6 +7,7 @@ import useSize from './hooks/useSize'
 import useWindowViewportRectRef from './hooks/useWindowViewportRect'
 import { listSystem } from './listSystem'
 import { systemToComponent } from './react-urx'
+import { coversKnownRange } from './recycling/layout'
 import * as u from './urx'
 import { VirtuosoMockContext } from './utils/context'
 import { correctItemSize } from './utils/correctItemSize'
@@ -92,6 +93,7 @@ const itemListKeys = [
   'groupIndices',
   'alignToBottom',
   'initialItemFinalLocationReached',
+  'knownLayout',
 ] as const
 
 const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = false }: { showTopList?: boolean }) {
@@ -117,6 +119,7 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
     groupIndices,
     alignToBottom,
     initialItemFinalLocationReached,
+    knownLayout,
   ] = useEmitterValues(itemListKeys)
   const sizeRanges = usePublisher('sizeRanges')
   const windowScrollContainerStateCallback = usePublisher('windowScrollContainerState')
@@ -134,7 +137,11 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
     listGap,
     customScrollParent,
     horizontalDirection,
-    skipAnimationFrame
+    skipAnimationFrame,
+    knownLayout,
+    !showTopList &&
+      listState.items.length > 0 &&
+      coversKnownRange(knownLayout, listState.items[0]!.originalIndex!, listState.items[listState.items.length - 1]!.originalIndex!)
   )
 
   const [deviation, setDeviation] = React.useState(0)
