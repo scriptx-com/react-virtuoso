@@ -95,7 +95,7 @@ for (const recycling of [false, true]) {
           { horizontal, rtl }
         )
       await expect.poll(async () => (await measure()).gap).toBe(40)
-      expect((await measure()).extent).toBe(100200)
+      await expect.poll(async () => (await measure()).extent).toBe(100200)
       await page.locator('[data-virtuoso-scroller]').evaluate(
         (node, { horizontal, rtl }) => {
           if (horizontal) {

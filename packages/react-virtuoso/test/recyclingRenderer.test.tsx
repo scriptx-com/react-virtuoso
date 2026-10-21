@@ -80,7 +80,7 @@ it('reuses hosts and mounted children, rendering only reassigned content', () =>
   ])
 })
 
-it('preserves intentional descendant keys while reusing the outer host', () => {
+it.each([false, true])('preserves intentional descendant keys while reusing the outer host (horizontal=%s)', (horizontal) => {
   const mounts = vi.fn()
   function Keyed({ id }: { id: number }) {
     React.useEffect(() => {
@@ -90,11 +90,13 @@ it('preserves intentional descendant keys while reusing the outer host', () => {
     return <span>{id}</span>
   }
   const itemContent = (index: number) => <Keyed id={index} key={index} />
-  const view = render(<RecycledItems {...base} items={range(0, 1)} itemContent={itemContent} />)
+  const view = render(<RecycledItems {...base} horizontal={horizontal} items={range(0, 1)} itemContent={itemContent} />)
   const host = view.container.querySelector('[data-recycling-slot]')
-  view.rerender(<RecycledItems {...base} items={range(1, 1)} itemContent={itemContent} />)
+  view.rerender(<RecycledItems {...base} horizontal={horizontal} items={range(1, 1)} itemContent={itemContent} />)
   expect(view.container.querySelector('[data-recycling-slot]')).toBe(host)
-  expect(mounts.mock.calls).toEqual([[0], [1]])
+  view.rerender(<RecycledItems {...base} horizontal={horizontal} items={range(0, 1)} itemContent={itemContent} />)
+  expect(view.container.querySelector('[data-recycling-slot]')).toBe(host)
+  expect(mounts.mock.calls).toEqual([[0], [1], [0]])
 })
 
 it('parks incompatible idle cells without measurement attributes or active lifecycle', () => {
@@ -271,4 +273,85 @@ it('retires a focused host when its logical item changes to an incompatible type
     />
   )
   expect(focusedHost?.isConnected).toBe(false)
+})
+
+it('bounds the whole nested tree and drops inner idle reserves when outer rows park', () => {
+  const innerContent = (_index: number, item: { id: number }) => <span>{item.id}</span>
+  const rareType = (item: { id: number }) => item.id
+  function Row({ row, phase, width }: { row: number; phase: number; width: number }) {
+    return <RecycledItems {...base} horizontal items={range((row + phase) % 90, width)} itemContent={innerContent} getItemType={rareType} />
+  }
+  const itemContent = (_index: number, row: { id: number }, context: { phase: number; width: number }) => (
+    <Row key={row.id} row={row.id} {...context} />
+  )
+  const view = render(
+    <RecycledItems {...base} items={range(0, 5)} itemContent={itemContent} getItemType={rareType} context={{ phase: 0, width: 8 }} />
+  )
+  let peak = 0
+  for (let pass = 0; pass < 20; pass++) {
+    const width = 2 + (pass % 7)
+    for (let step = 0; step < 20; step++) {
+      const start = (pass % 2 ? 19 - step : step) * 5
+      view.rerender(
+        <RecycledItems
+          {...base}
+          items={range(start, 5)}
+          itemContent={itemContent}
+          getItemType={rareType}
+          context={{ phase: pass + step, width }}
+        />
+      )
+      const hosts = view.container.querySelectorAll('[data-recycling-slot]')
+      peak = Math.max(peak, hosts.length)
+      expect(hosts.length).toBeLessThanOrEqual(10 * (1 + 2 * 8))
+      const lists = [...view.container.querySelectorAll('[data-recycling-list]')]
+      expect(lists.length).toBeLessThanOrEqual(11)
+      for (const list of lists.slice(1)) {
+        const parked = list.closest('[data-recycling-slot][aria-hidden="true"]')
+        expect(list.children.length).toBeLessThanOrEqual(parked ? 8 : width * 2)
+      }
+    }
+  }
+  expect(peak).toBeGreaterThan(5 * 3)
+})
+
+it.each([false, true])('keeps state and callbacks with the logical item A-B-A (horizontal=%s)', (horizontal) => {
+  const mounts = vi.fn()
+  const pressed = vi.fn()
+  let staleSetter: ((value: string) => void) | undefined
+  function Cell({ id }: { id: number }) {
+    const [value, setValue] = useRecyclingState(() => String(id), [])
+    React.useEffect(() => {
+      mounts()
+    }, [])
+    if (!staleSetter) {
+      staleSetter = setValue
+    }
+    return (
+      <button
+        onClick={() => {
+          pressed(id)
+          setValue(`clicked-${id}`)
+        }}
+      >
+        {value}
+      </button>
+    )
+  }
+  const itemContent = (index: number) => <Cell id={index} />
+  const view = render(<RecycledItems {...base} horizontal={horizontal} items={range(0, 1)} itemContent={itemContent} />)
+  const button = view.container.querySelector('button')!
+  act(() => button.click())
+  expect(button.textContent).toBe('clicked-0')
+  view.rerender(<RecycledItems {...base} horizontal={horizontal} items={range(1, 1)} itemContent={itemContent} />)
+  act(() => staleSetter!('stale'))
+  expect(button.textContent).toBe('1')
+  act(() => button.click())
+  expect(button.textContent).toBe('clicked-1')
+  view.rerender(<RecycledItems {...base} horizontal={horizontal} items={range(0, 1)} itemContent={itemContent} />)
+  expect(button.textContent).toBe('0')
+  expect(view.container.querySelector('button')).toBe(button)
+  expect(mounts).toHaveBeenCalledTimes(1)
+  act(() => button.click())
+  expect(pressed.mock.calls).toEqual([[0], [1], [0]])
 })
