@@ -68,17 +68,21 @@ export default function useChangedListContentsSizes(
             ? getLogicalScrollLeft(scrollableElement, scrollableElement.scrollLeft)
             : scrollableElement.scrollTop
 
+      const measuredGap = gap
+        ? horizontalDirection
+          ? resolveGapValue('column-gap', getComputedStyle(el).columnGap, log)
+          : resolveGapValue('row-gap', getComputedStyle(el).rowGap, log)
+        : undefined
+
       scrollContainerStateCallback({
         scrollHeight,
         scrollTop: Math.max(scrollTop, 0),
         viewportHeight,
       })
 
-      gap?.(
-        horizontalDirection
-          ? resolveGapValue('column-gap', getComputedStyle(el).columnGap, log)
-          : resolveGapValue('row-gap', getComputedStyle(el).rowGap, log)
-      )
+      if (measuredGap !== undefined) {
+        gap?.(measuredGap)
+      }
 
       if (ranges !== null) {
         callback(ranges)

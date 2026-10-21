@@ -1,3 +1,4 @@
+import type { InitialGeometry } from '../initialGeometry'
 import type {
   Components,
   ComputeItemKey,
@@ -308,6 +309,8 @@ export interface VirtuosoProps<Data, Context> extends ListRootProps {
    * When set, turns the scroller into a horizontal list. The items are positioned with `inline-block`.
    */
   horizontalDirection?: boolean
+  /** Seeds initial horizontal sizes when the viewport, cells and padding are known. */
+  initialGeometry?: InitialGeometry
 
   /**
    *

@@ -1,5 +1,6 @@
 import * as u from './urx'
 
+import type { InitialGeometry } from './initialGeometry'
 import type { ScrollContainerState } from './interfaces'
 
 export const domIOSystem = u.system(
@@ -46,6 +47,8 @@ export const domIOSystem = u.system(
       footerHeight,
       headerHeight,
       horizontalDirection,
+      initialGeometry: u.statefulStream<InitialGeometry | undefined>(undefined),
+      initialGeometryReady: u.statefulStream(false),
       scrollBy,
       // input
       scrollContainerState,

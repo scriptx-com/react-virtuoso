@@ -126,7 +126,12 @@ function transposeItems(items: Item<any>[], sizes: SizeState, firstItemIndex: nu
   }
 
   if (!hasGroups(sizes)) {
-    return items.map((item) => ({ ...item, index: item.index + firstItemIndex, originalIndex: item.index }))
+    return items.map((item) => {
+      const result = { ...item } as ListItem<unknown>
+      result.index = item.index + firstItemIndex
+      result.originalIndex = item.index
+      return result
+    })
   }
 
   const startIndex = items[0]!.index

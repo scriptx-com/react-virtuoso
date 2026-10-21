@@ -29,9 +29,50 @@
  */
 import React from 'react'
 
+import { seedInitialGeometry } from '../initialGeometry'
 import * as u from '../urx'
 
 import type { AnySystemSpec, Emitter, Publisher, SR, StatefulStream, Stream } from '../urx'
+
+function createEmitterStore(streams: StatefulStream<unknown>[]) {
+  let snapshot = streams.map(u.getValue)
+  const getSnapshot = () => {
+    let next = snapshot
+    for (let index = 0; index < streams.length; index++) {
+      const value = u.getValue(streams[index]!)
+      if (!Object.is(value, snapshot[index])) {
+        if (next === snapshot) {
+          next = snapshot.slice()
+        }
+        next[index] = value
+      }
+    }
+    snapshot = next
+    return snapshot
+  }
+  const subscribe = (listener: () => void) => {
+    const observed = getSnapshot().slice()
+    let ready = false
+    const unsubscribe = streams.map((stream, index) =>
+      u.subscribe(stream, (value) => {
+        if (Object.is(value, observed[index])) {
+          return
+        }
+        observed[index] = value
+        if (ready) {
+          listener()
+        }
+      })
+    )
+    ready = true
+    return () => {
+      for (const remove of unsubscribe) {
+        remove()
+      }
+    }
+  }
+  return { subscribe, getSnapshot }
+}
 
 /** @internal */
 type Dict<T> = Record<string, T>
@@ -159,6 +200,7 @@ export function systemToComponent<SS extends AnySystemSpec, M extends SystemProp
   const methodNames = Object.keys(map.methods || {})
   const eventNames = Object.keys(map.events || {})
   const Context = React.createContext({} as ContextValue)
+  const multiStores = new WeakMap<ContextValue, WeakMap<readonly (keyof S)[], ReturnType<typeof createEmitterStore>>>()
 
   type RootCompProps = R extends React.ComponentType<infer RP> ? RP : { children?: React.ReactNode }
 
@@ -166,7 +208,7 @@ export function systemToComponent<SS extends AnySystemSpec, M extends SystemProp
 
   type CompMethods = MethodsFromPropMap<SS, M>
 
-  function applyPropsToSystem(system: ContextValue, props: any) {
+  function applyPropsToSystem(system: ContextValue, props: any, initializing = false) {
     if (system.propsReady !== undefined) {
       u.publish(system.propsReady, false)
     }
@@ -183,6 +225,9 @@ export function systemToComponent<SS extends AnySystemSpec, M extends SystemProp
       }
     }
 
+    if (initializing) {
+      seedInitialGeometry(system, props)
+    }
     if (system.propsReady !== undefined) {
       u.publish(system.propsReady, true)
     }
@@ -214,7 +259,7 @@ export function systemToComponent<SS extends AnySystemSpec, M extends SystemProp
 
     const [system] = React.useState(() => {
       return u.tap(u.init(systemSpec), (system) => {
-        applyPropsToSystem(system, props)
+        applyPropsToSystem(system, props, true)
       })
     })
 
@@ -301,6 +346,22 @@ export function systemToComponent<SS extends AnySystemSpec, M extends SystemProp
 
   const useEmitterValue = parseInt(React.version) >= 18 ? useEmitterValue18 : useEmitterValueLegacy
 
+  type Values<K extends readonly (keyof S)[]> = { [I in keyof K]: S[K[I]] extends StatefulStream<infer V> ? V : never }
+  const useEmitterValues18 = <K extends readonly (keyof S)[]>(keys: K): Values<K> => {
+    const system = React.useContext(Context)
+    let stores = multiStores.get(system)
+    if (!stores) {
+      multiStores.set(system, (stores = new WeakMap()))
+    }
+    let store = stores.get(keys)
+    if (!store) {
+      stores.set(keys, (store = createEmitterStore(keys.map((key) => system[key]))))
+    }
+    return React.useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot) as Values<K>
+  }
+  const useEmitterValuesLegacy = <K extends readonly (keyof S)[]>(keys: K): Values<K> => keys.map(useEmitterValueLegacy) as Values<K>
+  const useEmitterValues = parseInt(React.version) >= 18 ? useEmitterValues18 : useEmitterValuesLegacy
+
   const useEmitter = <K extends keyof S, V = S[K] extends Stream<infer R> ? R : never>(key: K, callback: (value: V) => void) => {
     const context = React.useContext(Context)
     const source: Stream<V> = context[key]
@@ -311,6 +372,7 @@ export function systemToComponent<SS extends AnySystemSpec, M extends SystemProp
     Component,
     useEmitter,
     useEmitterValue,
+    useEmitterValues,
     usePublisher,
   }
 }

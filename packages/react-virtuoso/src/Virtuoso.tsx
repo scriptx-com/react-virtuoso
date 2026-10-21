@@ -70,24 +70,60 @@ const GROUP_STYLE = { overflowAnchor: 'none', position: positionStickyCssValue()
 const ITEM_STYLE = { overflowAnchor: 'none' } as const
 const HORIZONTAL_ITEM_STYLE = { ...ITEM_STYLE, display: 'inline-block', height: '100%' } as const
 
-const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = false }: { showTopList?: boolean }) {
-  const listState = useEmitterValue('listState')
+const itemListKeys = [
+  'listState',
+  'useWindowScroll',
+  'customScrollParent',
+  'itemContent',
+  'context',
+  'groupContent',
+  'trackItemSizes',
+  'itemSize',
+  'log',
+  'horizontalDirection',
+  'skipAnimationFrameInResizeObserver',
+  'EmptyPlaceholder',
+  'ScrollSeekPlaceholder',
+  'ListComponent',
+  'ItemComponent',
+  'GroupComponent',
+  'computeItemKey',
+  'isSeeking',
+  'groupIndices',
+  'alignToBottom',
+  'initialItemFinalLocationReached',
+] as const
 
+const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = false }: { showTopList?: boolean }) {
+  const [
+    listState,
+    useWindowScroll,
+    customScrollParent,
+    itemContent,
+    context,
+    groupContent,
+    trackItemSizes,
+    itemSize,
+    log,
+    horizontalDirection,
+    skipAnimationFrame,
+    EmptyPlaceholder,
+    placeholder,
+    OptionalListComponent,
+    OptionalItemComponent,
+    OptionalGroupComponent,
+    computeItemKey,
+    isSeeking,
+    groupIndices,
+    alignToBottom,
+    initialItemFinalLocationReached,
+  ] = useEmitterValues(itemListKeys)
   const sizeRanges = usePublisher('sizeRanges')
-  const useWindowScroll = useEmitterValue('useWindowScroll')
-  const customScrollParent = useEmitterValue('customScrollParent')
   const windowScrollContainerStateCallback = usePublisher('windowScrollContainerState')
   const _scrollContainerStateCallback = usePublisher('scrollContainerState')
   const scrollContainerStateCallback =
     customScrollParent || useWindowScroll ? windowScrollContainerStateCallback : _scrollContainerStateCallback
-  const itemContent = useEmitterValue('itemContent')
-  const context = useEmitterValue('context')
-  const groupContent = useEmitterValue('groupContent')
-  const trackItemSizes = useEmitterValue('trackItemSizes')
-  const itemSize = useEmitterValue('itemSize')
-  const log = useEmitterValue('log')
   const listGap = usePublisher('gap')
-  const horizontalDirection = useEmitterValue('horizontalDirection')
 
   const { callbackRef } = useChangedListContentsSizes(
     sizeRanges,
@@ -98,7 +134,7 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
     listGap,
     customScrollParent,
     horizontalDirection,
-    useEmitterValue('skipAnimationFrameInResizeObserver')
+    skipAnimationFrame
   )
 
   const [deviation, setDeviation] = React.useState(0)
@@ -109,16 +145,11 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
     }
   })
 
-  const EmptyPlaceholder = useEmitterValue('EmptyPlaceholder')
-  const ScrollSeekPlaceholder = useEmitterValue('ScrollSeekPlaceholder') ?? DefaultScrollSeekPlaceholder
-  const ListComponent = useEmitterValue('ListComponent')!
-  const ItemComponent = useEmitterValue('ItemComponent')!
-  const GroupComponent = useEmitterValue('GroupComponent')!
-  const computeItemKey = useEmitterValue('computeItemKey')
-  const isSeeking = useEmitterValue('isSeeking')
-  const hasGroups = useEmitterValue('groupIndices').length > 0
-  const alignToBottom = useEmitterValue('alignToBottom')
-  const initialItemFinalLocationReached = useEmitterValue('initialItemFinalLocationReached')
+  const ListComponent = OptionalListComponent!
+  const ItemComponent = OptionalItemComponent!
+  const GroupComponent = OptionalGroupComponent!
+  const ScrollSeekPlaceholder = placeholder ?? DefaultScrollSeekPlaceholder
+  const hasGroups = groupIndices.length > 0
 
   const containerStyle: React.CSSProperties = showTopList
     ? {}
@@ -196,21 +227,19 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
           )
         }
 
-        return (
-          <ItemComponent
-            {...contextPropIfNotDomElement(ItemComponent, context)}
-            {...itemPropIfNotDomElement(ItemComponent, item.data)}
-            data-index={index}
-            data-item-group-index={item.groupIndex}
-            data-item-index={item.index}
-            data-known-size={item.size}
-            key={key}
-            style={horizontalDirection ? HORIZONTAL_ITEM_STYLE : ITEM_STYLE}
-          >
-            {hasGroups
-              ? (itemContent as GroupItemContent<any, any>)(item.index, item.groupIndex!, item.data, context)
-              : (itemContent as ItemContent<any, any>)(item.index, item.data, context)}
-          </ItemComponent>
+        return React.createElement(
+          ItemComponent as React.ElementType,
+          Object.assign(typeof ItemComponent === 'string' ? {} : { context }, itemPropIfNotDomElement(ItemComponent, item.data), {
+            'data-index': index,
+            'data-item-group-index': item.groupIndex,
+            'data-item-index': item.index,
+            'data-known-size': item.size,
+            key,
+            style: horizontalDirection ? HORIZONTAL_ITEM_STYLE : ITEM_STYLE,
+          }),
+          hasGroups
+            ? (itemContent as GroupItemContent<any, any>)(item.index, item.groupIndex!, item.data, context)
+            : (itemContent as ItemContent<any, any>)(item.index, item.data, context)
         )
       })}
     </ListComponent>
@@ -254,7 +283,7 @@ const topItemListStyle: React.CSSProperties = {
 
 export function contextPropIfNotDomElement<C>(element: unknown, context: C): ContextProp<C> {
   if (typeof element === 'string') {
-    // @ts-expect-error lie the type system, we don't want to return anything for dom elements
+    // @ts-expect-error DOM components omit the context prop at runtime.
     return undefined
   }
   return { context }
@@ -314,7 +343,8 @@ interface Hooks {
   usePublisher: typeof usePublisher
 }
 
-export function buildScroller({ useEmitter, useEmitterValue, usePublisher }: Hooks) {
+export function buildScroller({ useEmitter, useEmitterValue, usePublisher }: Hooks, supportsInitialGeometry = false) {
+  const useInitialGeometryReady = supportsInitialGeometry ? () => useEmitterValue('initialGeometryReady') : () => false
   const Scroller: Components['Scroller'] = React.memo(function VirtuosoScroller({ children, style, context, ...props }) {
     const scrollContainerStateCallback = usePublisher('scrollContainerState')
     const ScrollerComponent = useEmitterValue('ScrollerComponent')!
@@ -328,7 +358,8 @@ export function buildScroller({ useEmitter, useEmitterValue, usePublisher }: Hoo
       ScrollerComponent,
       scrollerRefCallback,
       undefined,
-      horizontalDirection
+      horizontalDirection,
+      useInitialGeometryReady()
     )
 
     useEmitter('scrollTo', scrollToCallback)
@@ -487,6 +518,7 @@ export const {
   Component: List,
   useEmitter,
   useEmitterValue,
+  useEmitterValues,
   usePublisher,
 } = /*#__PURE__*/ systemToComponent(
   combinedSystem,
@@ -526,6 +558,7 @@ export const {
       scrollerRef: 'scrollerRef',
       logLevel: 'logLevel',
       horizontalDirection: 'horizontalDirection',
+      initialGeometry: 'initialGeometry',
       skipAnimationFrameInResizeObserver: 'skipAnimationFrameInResizeObserver',
     },
     methods: {
@@ -551,7 +584,7 @@ export const {
   ListRoot
 )
 
-const Scroller = /*#__PURE__*/ buildScroller({ useEmitter, useEmitterValue, usePublisher })
+const Scroller = /*#__PURE__*/ buildScroller({ useEmitter, useEmitterValue, usePublisher }, true)
 const WindowScroller = /*#__PURE__*/ buildWindowScroller({ useEmitter, useEmitterValue, usePublisher })
 
 /**

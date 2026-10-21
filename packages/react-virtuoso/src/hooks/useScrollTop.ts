@@ -24,8 +24,10 @@ export default function useScrollTop(
   scrollerElement: any,
   scrollerRefCallback: (ref: ScrollerRef) => void = u.noop,
   customScrollParent?: HTMLElement,
-  horizontalDirection?: boolean
+  horizontalDirection?: boolean,
+  initialGeometryReady = false
 ) {
+  const initialized = React.useRef(false)
   const scrollerRef = React.useRef<HTMLElement | null | Window>(null)
   const scrollTopTarget = React.useRef<any>(null)
   const timeoutRef = React.useRef<null | ReturnType<typeof setTimeout>>(null)
@@ -86,7 +88,10 @@ export default function useScrollTop(
 
     clearHorizontalScrollDirectionCache(localRef)
     scrollerRefCallback(customScrollParent ? customScrollParent : scrollerRef.current)
-    handler({ suppressFlushSync: true, target: localRef } as unknown as Event)
+    if (!initialGeometryReady || initialized.current) {
+      handler({ suppressFlushSync: true, target: localRef } as unknown as Event)
+    }
+    initialized.current = true
     localRef.addEventListener('scroll', handler, { passive: true })
 
     return () => {
@@ -94,7 +99,7 @@ export default function useScrollTop(
       scrollerRefCallback(null)
       localRef.removeEventListener('scroll', handler)
     }
-  }, [scrollerRef, handler, scrollerElement, scrollerRefCallback, customScrollParent])
+  }, [scrollerRef, handler, scrollerElement, scrollerRefCallback, customScrollParent, initialGeometryReady])
 
   function scrollToCallback(location: ScrollToOptions) {
     const scrollerElement = scrollerRef.current
