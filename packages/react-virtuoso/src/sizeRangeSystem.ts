@@ -30,7 +30,7 @@ function getViewportIncrease(value: ViewportIncrease, end: ListEnd) {
 }
 
 export const sizeRangeSystem = u.system(
-  ([{ deviation, fixedHeaderHeight, headerHeight, scrollTop, viewportHeight }]) => {
+  ([{ contentInsets, deviation, fixedHeaderHeight, headerHeight, scrollTop, viewportHeight }]) => {
     const listBoundary = u.stream<NumberTuple>()
     const topListHeight = u.statefulStream(0)
     const increaseViewportBy = u.statefulStream<ViewportIncrease>(0)
@@ -49,7 +49,8 @@ export const sizeRangeSystem = u.system(
           u.duc(fixedHeaderHeight),
           u.duc(deviation),
           u.duc(increaseViewportBy),
-          recyclingWindow
+          recyclingWindow,
+          u.duc(contentInsets)
         ),
         u.map(
           ([
@@ -63,7 +64,9 @@ export const sizeRangeSystem = u.system(
             deviation,
             increaseViewportBy,
             recyclingWindow,
+            contentInsets,
           ]) => {
+            headerHeight += contentInsets.start
             const top = scrollTop - deviation
             if (recyclingWindow) {
               const origin = headerHeight + fixedHeaderHeight + deviation

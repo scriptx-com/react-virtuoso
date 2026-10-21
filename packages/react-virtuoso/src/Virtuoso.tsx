@@ -118,6 +118,7 @@ const itemListKeys = [
   'sizes',
   'gap',
   'fixedItemHeight',
+  'contentInsets',
 ] as const
 
 const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = false }: { showTopList?: boolean }) {
@@ -156,6 +157,7 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
     sizes,
     gap,
     fixedItemHeight,
+    contentInsets,
   ] = useEmitterValues(itemListKeys)
   const setDomFocusedKey = usePublisher('domFocusedKey')
   const supportsRecycling =
@@ -246,14 +248,14 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
               // same layout in LTR (which is the only writing mode this fork
               // targets) and work on every Chromium version.
               marginLeft: deviation !== 0 ? deviation : alignToBottom ? 'auto' : 0,
-              paddingRight: rtl ? listState.offsetTop : listState.offsetBottom,
-              paddingLeft: rtl ? listState.offsetBottom : listState.offsetTop,
+              paddingRight: rtl ? listState.offsetTop + contentInsets.start : listState.offsetBottom + contentInsets.end,
+              paddingLeft: rtl ? listState.offsetBottom + contentInsets.end : listState.offsetTop + contentInsets.start,
               whiteSpace: 'nowrap',
             }
           : {
               marginTop: deviation !== 0 ? deviation : alignToBottom ? 'auto' : 0,
-              paddingBottom: listState.offsetBottom,
-              paddingTop: listState.offsetTop,
+              paddingBottom: listState.offsetBottom + contentInsets.end,
+              paddingTop: listState.offsetTop + contentInsets.start,
             }),
         ...(initialItemFinalLocationReached ? {} : { visibility: 'hidden' }),
       }
@@ -265,6 +267,7 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
   if (recycle) {
     return (
       <RecycledItems
+        contentInsets={contentInsets}
         items={listState.items}
         data={data}
         totalCount={listState.totalCount}

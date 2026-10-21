@@ -13,6 +13,7 @@ export const domIOSystem = u.system(
     const viewportHeight = u.stream<number>()
     const scrollHeight = u.stream<number>()
     const headerHeight = u.statefulStream(0)
+    const contentInsets = u.statefulStream({ start: 0, end: 0 })
     const fixedHeaderHeight = u.statefulStream(0)
     const fixedFooterHeight = u.statefulStream(0)
     const footerHeight = u.statefulStream(0)
@@ -41,6 +42,7 @@ export const domIOSystem = u.system(
     u.connect(scrollTop, statefulScrollTop)
 
     return {
+      contentInsets,
       deviation,
       fixedFooterHeight,
       fixedHeaderHeight,

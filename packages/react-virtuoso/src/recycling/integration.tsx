@@ -8,7 +8,13 @@ export interface PixelWindow {
   readonly end: number
 }
 
+export interface ContentInsets {
+  readonly start: number
+  readonly end: number
+}
+
 export interface RecyclingSnapshot {
+  readonly contentInsets: ContentInsets
   readonly window: PixelWindow | undefined
   readonly knownLayout: KnownLayout | undefined
   readonly focusedKey: React.Key | null
@@ -16,7 +22,13 @@ export interface RecyclingSnapshot {
 }
 
 export function createRecyclingController() {
-  let snapshot: RecyclingSnapshot = { window: undefined, knownLayout: undefined, focusedKey: null, revision: 0 }
+  let snapshot: RecyclingSnapshot = {
+    contentInsets: { start: 0, end: 0 },
+    window: undefined,
+    knownLayout: undefined,
+    focusedKey: null,
+    revision: 0,
+  }
   let pending: RecyclingSnapshot | undefined
   let depth = 0
   let layoutInput: KnownLayout | undefined
@@ -28,7 +40,12 @@ export function createRecyclingController() {
     }
     const next = pending
     pending = undefined
-    if (next.window === snapshot.window && next.knownLayout === snapshot.knownLayout && next.focusedKey === snapshot.focusedKey) {
+    if (
+      next.window === snapshot.window &&
+      next.knownLayout === snapshot.knownLayout &&
+      next.focusedKey === snapshot.focusedKey &&
+      next.contentInsets === snapshot.contentInsets
+    ) {
       return
     }
     snapshot = { ...next, revision: snapshot.revision + 1 }
@@ -52,6 +69,16 @@ export function createRecyclingController() {
         depth--
         flush()
       }
+    },
+    setContentInsets(input: ContentInsets) {
+      const start = Number.isFinite(input.start) ? Math.max(0, input.start) : 0
+      const end = Number.isFinite(input.end) ? Math.max(0, input.end) : 0
+      const value = current()
+      if (value.contentInsets.start === start && value.contentInsets.end === end) {
+        return
+      }
+      pending = { ...value, contentInsets: { start, end } }
+      flush()
     },
     setWindow(input: PixelWindow | undefined) {
       const window =

@@ -43,6 +43,9 @@ export function Example() {
     Object.assign(window, { recyclingMetrics: metrics })
     Object.assign(metrics, { mounts: 0, updates: 0, unmounts: 0 })
     const value = createRecyclingController()
+    if (query.get('insets') === '1') {
+      value.setContentInsets({ start: 40, end: 60 })
+    }
     if (!unknown) {
       value.setKnownLayout({ revision: 1, ranges: [{ startIndex: 0, endIndex: 999, size: 100 }] })
     }

@@ -2,6 +2,7 @@ import React from 'react'
 
 /** One committed assignment of a physical cell to a logical item. */
 export interface RecyclingAssignment {
+  index?: number
   logicalKey: React.Key
   slotId: number
   generation: number

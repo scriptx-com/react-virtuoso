@@ -68,3 +68,54 @@ test('measures an unknown absolute child after a late resize', async ({ page, ba
   )
   expect(Math.abs(gap)).toBeLessThanOrEqual(1)
 })
+
+for (const recycling of [false, true]) {
+  for (const [horizontal, rtl] of [
+    [false, false],
+    [true, false],
+    [true, true],
+  ] as const) {
+    test(`preserves content insets recycling=${recycling} horizontal=${horizontal} rtl=${rtl}`, async ({ page, baseURL }) => {
+      await page.goto(
+        `${baseURL}/?story=recycling--example&insets=1&recycling=${Number(recycling)}&horizontal=${Number(horizontal)}&rtl=${Number(rtl)}`
+      )
+      await page.waitForSelector('[data-storyloaded]')
+      await expect(page.locator('[data-cell="0"]')).toBeVisible()
+      const measure = () =>
+        page.evaluate(
+          ({ horizontal, rtl }) => {
+            const scroller = document.querySelector('[data-virtuoso-scroller]')!
+            const header = document.querySelector('[data-testid="header"]')!.getBoundingClientRect()
+            const first = document.querySelector('[data-cell="0"]')!.getBoundingClientRect()
+            return {
+              gap: horizontal ? (rtl ? header.left - first.right : first.left - header.right) : first.top - header.bottom,
+              extent: horizontal ? scroller.scrollWidth : scroller.scrollHeight,
+            }
+          },
+          { horizontal, rtl }
+        )
+      await expect.poll(async () => (await measure()).gap).toBe(40)
+      expect((await measure()).extent).toBe(100200)
+      await page.locator('[data-virtuoso-scroller]').evaluate(
+        (node, { horizontal, rtl }) => {
+          if (horizontal) {
+            node.scrollLeft = rtl ? -node.scrollWidth : node.scrollWidth
+          } else {
+            node.scrollTop = node.scrollHeight
+          }
+        },
+        { horizontal, rtl }
+      )
+      await expect(page.locator('[data-cell="999"]')).toBeVisible()
+      const trailingGap = await page.evaluate(
+        ({ horizontal, rtl }) => {
+          const footer = document.querySelector('[data-testid="footer"]')!.getBoundingClientRect()
+          const last = document.querySelector('[data-cell="999"]')!.getBoundingClientRect()
+          return horizontal ? (rtl ? last.left - footer.right : footer.left - last.right) : footer.top - last.bottom
+        },
+        { horizontal, rtl }
+      )
+      expect(trailingGap).toBe(60)
+    })
+  }
+}

@@ -4,10 +4,11 @@ import * as u from '../urx'
 import { RecyclingIntegrationContext } from './integration'
 import { useRecyclingActivity } from './RecyclingContext'
 
-import type { PixelWindow } from './integration'
+import type { ContentInsets, PixelWindow } from './integration'
 import type { KnownLayout } from './layout'
 
 interface RecyclingSystem {
+  contentInsets: u.StatefulStream<ContentInsets>
   propsReady: u.StatefulStream<boolean>
   recycling: u.StatefulStream<boolean | undefined>
   getItemType: u.StatefulStream<((item: any, index: number) => number | string | undefined) | undefined>
@@ -17,6 +18,7 @@ interface RecyclingSystem {
   recyclingActive: u.StatefulStream<boolean>
 }
 
+const EMPTY_INSETS = { start: 0, end: 0 }
 const appliedLayouts = new WeakMap<RecyclingSystem, KnownLayout | undefined>()
 
 export function useRecyclingSystemBinding() {
@@ -41,6 +43,7 @@ export function useRecyclingSystemBinding() {
         u.publish(system.applyKnownLayout, layout)
       }
       if (active) {
+        u.publish(system.contentInsets, snapshot?.contentInsets ?? EMPTY_INSETS)
         u.publish(system.recyclingWindow, snapshot?.window)
         u.publish(system.integrationFocusedKey, snapshot?.focusedKey ?? null)
       }

@@ -27,7 +27,7 @@ const defaultCalculateViewLocation: CalculateViewLocation = ({
 export const scrollIntoViewSystem = u.system(
   ([
     { gap, sizes, totalCount },
-    { fixedFooterHeight, fixedHeaderHeight, headerHeight, scrollingInProgress, scrollTop, viewportHeight },
+    { contentInsets, fixedFooterHeight, fixedHeaderHeight, headerHeight, scrollingInProgress, scrollTop, viewportHeight },
     { scrollToIndex },
   ]) => {
     const scrollIntoView = u.stream<ScrollIntoViewLocation>()
@@ -36,42 +36,48 @@ export const scrollIntoViewSystem = u.system(
       u.pipe(
         scrollIntoView,
         u.withLatestFrom(sizes, viewportHeight, totalCount, headerHeight, fixedHeaderHeight, fixedFooterHeight, scrollTop),
-        u.withLatestFrom(gap),
-        u.map(([[viewLocation, sizes, viewportHeight, totalCount, headerHeight, fixedHeaderHeight, fixedFooterHeight, scrollTop], gap]) => {
-          const { calculateViewLocation = defaultCalculateViewLocation, done, ...locationParams } = viewLocation
-          const actualIndex = originalIndexFromLocation(viewLocation, sizes, totalCount - 1)
+        u.withLatestFrom(gap, contentInsets),
+        u.map(
+          ([
+            [viewLocation, sizes, viewportHeight, totalCount, headerHeight, fixedHeaderHeight, fixedFooterHeight, scrollTop],
+            gap,
+            contentInsets,
+          ]) => {
+            const { calculateViewLocation = defaultCalculateViewLocation, done, ...locationParams } = viewLocation
+            const actualIndex = originalIndexFromLocation(viewLocation, sizes, totalCount - 1)
 
-          const itemTop = offsetOf(actualIndex, sizes.offsetTree, gap) + headerHeight + fixedHeaderHeight
-          const itemBottom = itemTop + findMaxKeyValue(sizes.sizeTree, actualIndex)[1]!
-          const viewportTop = scrollTop + fixedHeaderHeight
-          const viewportBottom = scrollTop + viewportHeight - fixedFooterHeight
+            const itemTop = offsetOf(actualIndex, sizes.offsetTree, gap) + headerHeight + fixedHeaderHeight + contentInsets.start
+            const itemBottom = itemTop + findMaxKeyValue(sizes.sizeTree, actualIndex)[1]!
+            const viewportTop = scrollTop + fixedHeaderHeight
+            const viewportBottom = scrollTop + viewportHeight - fixedFooterHeight
 
-          const location = calculateViewLocation({
-            itemBottom,
-            itemTop,
-            locationParams,
-            viewportBottom,
-            viewportTop,
-          })
+            const location = calculateViewLocation({
+              itemBottom,
+              itemTop,
+              locationParams,
+              viewportBottom,
+              viewportTop,
+            })
 
-          if (location !== null) {
-            done &&
-              u.handleNext(
-                u.pipe(
-                  scrollingInProgress,
-                  u.filter((value) => !value),
-                  // skips the initial publish of false, and the cleanup call.
-                  // but if scrollingInProgress is true, we skip the initial publish.
-                  u.skip(u.getValue(scrollingInProgress) ? 1 : 2)
-                ),
-                done
-              )
-          } else {
-            done?.()
+            if (location !== null) {
+              done &&
+                u.handleNext(
+                  u.pipe(
+                    scrollingInProgress,
+                    u.filter((value) => !value),
+                    // skips the initial publish of false, and the cleanup call.
+                    // but if scrollingInProgress is true, we skip the initial publish.
+                    u.skip(u.getValue(scrollingInProgress) ? 1 : 2)
+                  ),
+                  done
+                )
+            } else {
+              done?.()
+            }
+
+            return location
           }
-
-          return location
-        }),
+        ),
         u.filter((value) => value !== null)
       ),
       scrollToIndex

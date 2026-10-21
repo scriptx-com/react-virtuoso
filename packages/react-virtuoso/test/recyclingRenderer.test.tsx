@@ -228,3 +228,13 @@ it('forwards custom hosts, data, refs and context without losing reuse', () => {
   expect(view.container.querySelectorAll('[data-context="list-context"]')).toHaveLength(3)
   expect([...view.container.querySelectorAll('[data-custom-item]')]).toContain(host)
 })
+
+it('positions both ordinary and focused cells inside content insets', () => {
+  const content = (index: number) => <span>{index}</span>
+  const view = render(<RecycledItems {...base} contentInsets={{ start: 40, end: 60 }} items={range(0)} itemContent={content} />)
+  expect((view.container.firstElementChild as HTMLElement).style.height).toBe('10100px')
+  expect(view.container.querySelector<HTMLElement>('[data-index="0"]')!.style.top).toBe('40px')
+  view.rerender(<RecycledItems {...base} contentInsets={{ start: 40, end: 60 }} items={range(10)} itemContent={content} focusedKey={0} />)
+  expect(view.container.querySelector<HTMLElement>('[data-index="0"]')!.style.top).toBe('40px')
+  expect(view.container.querySelector<HTMLElement>('[data-index="10"]')!.style.top).toBe('1040px')
+})

@@ -9,6 +9,7 @@ import { createCellSizeObserver } from './useCellSizes'
 
 import type { ComputeItemKey, ItemContent, ListItem, SizeFunction, SizeRange } from '../interfaces'
 import type { SizeState } from '../sizeSystem'
+import type { ContentInsets } from './integration'
 import type { KnownLayout } from './layout'
 import type { PoolState, Slot } from './types'
 import type { CellMeasurement } from './useCellSizes'
@@ -21,6 +22,7 @@ interface CellRecord {
 }
 
 interface Props {
+  contentInsets?: ContentInsets
   items: readonly ListItem<any>[]
   data: readonly unknown[] | undefined
   totalCount: number
@@ -78,8 +80,8 @@ const Cell = React.memo(function RecycledCell({
   size,
 }: CellProps) {
   const assignment = React.useMemo(
-    () => ({ logicalKey: slot.key, slotId: slot.slotId, generation: slot.generation, active, scope }),
-    [slot.key, slot.slotId, slot.generation, active, scope]
+    () => ({ index, logicalKey: slot.key, slotId: slot.slotId, generation: slot.generation, active, scope }),
+    [slot.key, slot.slotId, slot.generation, active, scope, index]
   )
   const ref = React.useCallback((element: HTMLElement | null) => register(slot.slotId, element), [register, slot.slotId])
   const content = React.useMemo(
@@ -88,6 +90,7 @@ const Cell = React.memo(function RecycledCell({
   )
   const style: React.CSSProperties = {
     position: 'absolute',
+    boxSizing: 'border-box',
     overflowAnchor: 'none',
     ...(horizontal
       ? { top: 0, height: '100%', display: 'inline-block', [rtl ? 'right' : 'left']: offset, ...(exact ? { width: size } : {}) }
@@ -153,14 +156,14 @@ export function RecycledItems(props: Props) {
   const required = (active ? items : []).map((item) => {
     const index = item.originalIndex ?? item.index - firstItemIndex
     const key = computeItemKey(index + firstItemIndex, item.data, context)
-    byKey.set(key, { index, offset: item.offset, size: item.size, data: item.data })
+    byKey.set(key, { index, offset: item.offset + (props.contentInsets?.start ?? 0), size: item.size, data: item.data })
     return { index, key, type: getItemType?.(item.data, index + firstItemIndex) ?? 0 }
   })
 
   let focusedKey = props.focusedKey
   if (active && focusedKey !== null && !byKey.has(focusedKey)) {
     const old = committed.pool.slots.find((slot) => slot.key === focusedKey && slot.active)
-    let index = old?.index ?? -1
+    let index = old ? (committed.records.get(old.slotId)?.index ?? old.index) : -1
     const matches = (index: number) =>
       index >= 0 && index < totalCount && computeItemKey(index + firstItemIndex, data?.[index], context) === focusedKey
     if (!matches(index) && data) {
@@ -168,7 +171,12 @@ export function RecycledItems(props: Props) {
     }
     if (old && matches(index) && old.type === (getItemType?.(data?.[index], index + firstItemIndex) ?? 0)) {
       const offset = offsetOf(index, sizes.offsetTree, gap)
-      byKey.set(focusedKey, { index, data: data?.[index], offset, size: offsetOf(index + 1, sizes.offsetTree, gap) - offset - gap })
+      byKey.set(focusedKey, {
+        index,
+        data: data?.[index],
+        offset: offset + (props.contentInsets?.start ?? 0),
+        size: offsetOf(index + 1, sizes.offsetTree, gap) - offset - gap,
+      })
     } else {
       focusedKey = null
     }
@@ -268,7 +276,14 @@ export function RecycledItems(props: Props) {
     paddingBottom: 0,
     paddingLeft: 0,
     paddingRight: 0,
-    ...(horizontal ? { display: 'inline-block', width: totalSize, height: '100%', whiteSpace: 'nowrap' } : { height: totalSize }),
+    ...(horizontal
+      ? {
+          display: 'inline-block',
+          width: totalSize + (props.contentInsets?.start ?? 0) + (props.contentInsets?.end ?? 0),
+          height: '100%',
+          whiteSpace: 'nowrap',
+        }
+      : { height: totalSize + (props.contentInsets?.start ?? 0) + (props.contentInsets?.end ?? 0) }),
   }
   // Physical hosts move in DOM order as needed; accessible reading order stays logical.
   const ordered = [...pool.slots].sort(

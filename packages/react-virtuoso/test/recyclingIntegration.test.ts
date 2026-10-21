@@ -13,7 +13,7 @@ it('publishes an immutable snapshot once per dependent batch', () => {
     controller.setFocusedItem('item-1')
   })
   expect(listener).toHaveBeenCalledTimes(1)
-  expect(initial).toEqual({ revision: 0, window: undefined, knownLayout: undefined, focusedKey: null })
+  expect(initial).toEqual({ contentInsets: { start: 0, end: 0 }, revision: 0, window: undefined, knownLayout: undefined, focusedKey: null })
   expect(controller.getSnapshot()).toMatchObject({ revision: 1, window: { start: 100, end: 500 }, focusedKey: 'item-1' })
 })
 

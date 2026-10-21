@@ -116,7 +116,8 @@ export const listSystem = u.system(
       }
       const scrollTop = u.getValue(domIO.statefulScrollTop)
       const tree = u.getValue(sizes).offsetTree
-      const position = scrollTop - u.getValue(domIO.headerHeight) - u.getValue(domIO.fixedHeaderHeight)
+      const position =
+        scrollTop - u.getValue(domIO.headerHeight) - u.getValue(domIO.fixedHeaderHeight) - u.getValue(domIO.contentInsets).start
       if (position <= 0 || !tree.length || !u.getValue(scrolledToInitialItem)) {
         return
       }
@@ -149,7 +150,11 @@ export const listSystem = u.system(
       const offset = offsetOf(index, tree, itemGap)
       const size = offsetOf(index + 1, tree, itemGap) - offset - itemGap
       const target =
-        offset + Math.min(anchor.within, Math.max(0, size - 1)) + u.getValue(domIO.headerHeight) + u.getValue(domIO.fixedHeaderHeight)
+        offset +
+        Math.min(anchor.within, Math.max(0, size - 1)) +
+        u.getValue(domIO.headerHeight) +
+        u.getValue(domIO.fixedHeaderHeight) +
+        u.getValue(domIO.contentInsets).start
       const delta = target - anchor.scrollTop
       if (delta !== 0) {
         u.publish(domIO.scrollBy, { top: delta, behavior: 'auto' })
