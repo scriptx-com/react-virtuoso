@@ -160,7 +160,12 @@ export function RecycledItems(props: Props) {
     return { index, key, type: getItemType?.(item.data, index + firstItemIndex) ?? 0 }
   })
 
+  let sourcePool = committed.pool
   let focusedKey = props.focusedKey
+  const visibleFocused = required.find((item) => item.key === focusedKey)
+  if (visibleFocused && sourcePool.slots.some((slot) => slot.key === focusedKey && slot.type !== visibleFocused.type)) {
+    sourcePool = { ...sourcePool, slots: sourcePool.slots.filter((slot) => slot.key !== focusedKey || slot.type === visibleFocused.type) }
+  }
   if (active && focusedKey !== null && !byKey.has(focusedKey)) {
     const old = committed.pool.slots.find((slot) => slot.key === focusedKey && slot.active)
     let index = old ? (committed.records.get(old.slotId)?.index ?? old.index) : -1
@@ -178,12 +183,13 @@ export function RecycledItems(props: Props) {
         size: offsetOf(index + 1, sizes.offsetTree, gap) - offset - gap,
       })
     } else {
+      sourcePool = { ...sourcePool, slots: sourcePool.slots.filter((slot) => slot.key !== focusedKey) }
       focusedKey = null
     }
   }
 
   const pool: PoolState = active
-    ? allocateSlots(committed.pool, {
+    ? allocateSlots(sourcePool, {
         required,
         focusedKey: active ? focusedKey : null,
         idleBudget: active ? required.length : 0,

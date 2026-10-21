@@ -238,3 +238,37 @@ it('positions both ordinary and focused cells inside content insets', () => {
   expect(view.container.querySelector<HTMLElement>('[data-index="0"]')!.style.top).toBe('40px')
   expect(view.container.querySelector<HTMLElement>('[data-index="10"]')!.style.top).toBe('1040px')
 })
+
+it('unmounts a deleted focused owner so the host cannot silently transfer focus to its replacement', () => {
+  const unmounts = vi.fn()
+  function Cell({ id }: { id: number }) {
+    const mountedId = React.useRef(id)
+    React.useEffect(() => () => unmounts(mountedId.current), [])
+    return <span>{id}</span>
+  }
+  const itemContent = (_index: number, item: { id: number }) => <Cell id={item.id} />
+  const view = render(<RecycledItems {...base} items={range(0, 2)} itemContent={itemContent} focusedKey={0} />)
+  const focusedHost = view.container.querySelector('[data-item-index="0"]')
+  const next = data.slice(1)
+  const nextItems = range(1, 2).map((item, index) => ({ ...item, index, originalIndex: index, offset: index * 100 }))
+  view.rerender(<RecycledItems {...base} data={next} totalCount={next.length} items={nextItems} itemContent={itemContent} focusedKey={0} />)
+  expect(focusedHost?.isConnected).toBe(false)
+  expect(unmounts).toHaveBeenCalledWith(0)
+  expect(view.container.querySelectorAll('[data-item-index]')).toHaveLength(2)
+})
+
+it('retires a focused host when its logical item changes to an incompatible type', () => {
+  const itemContent = (_index: number, item: { id: number }) => <span>{item.id}</span>
+  const view = render(<RecycledItems {...base} items={range(0, 2)} itemContent={itemContent} focusedKey={0} getItemType={() => 'old'} />)
+  const focusedHost = view.container.querySelector('[data-item-index="0"]')
+  view.rerender(
+    <RecycledItems
+      {...base}
+      items={range(0, 2)}
+      itemContent={itemContent}
+      focusedKey={0}
+      getItemType={(item) => (item.id === 0 ? 'new' : 'old')}
+    />
+  )
+  expect(focusedHost?.isConnected).toBe(false)
+})
