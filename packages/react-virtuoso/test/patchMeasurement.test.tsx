@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
 
 import { Virtuoso } from '../src'
+import { RecyclingContext } from '../src/recycling/RecyclingContext'
 
 import type { VirtuosoProps } from '../src'
 import type { Root } from 'react-dom/client'
@@ -42,7 +43,7 @@ let root: Root
 const originalObserver = global.ResizeObserver
 const renderList = async (props: Partial<VirtuosoProps<string, string>> = {}) => {
   await act(async () => {
-    root.render(<Virtuoso data={data} initialItemCount={10} context="home" {...props} />)
+    root.render(<Virtuoso recycling={false} data={data} initialItemCount={10} context="home" {...props} />)
   })
 }
 const totals = () =>
@@ -145,4 +146,17 @@ it('ignores a queued notification from a replaced observer callback', async () =
   await renderList({ itemSize: newReader, skipAnimationFrameInResizeObserver: true })
   await act(async () => oldObserver.notify(list))
   expect(oldReader).not.toHaveBeenCalled()
+})
+
+it('unobserves viewport and item geometry when an ancestor parks', async () => {
+  const scope = {}
+  const tree = (active: boolean) => (
+    <RecyclingContext.Provider value={{ scope, logicalKey: 'parent', slotId: 0, generation: 1, active }}>
+      <Virtuoso recycling={false} data={data} initialItemCount={10} />
+    </RecyclingContext.Provider>
+  )
+  await act(async () => root.render(tree(true)))
+  expect(observers.some((observer) => observer.nodes.size > 0)).toBe(true)
+  await act(async () => root.render(tree(false)))
+  expect(observers.every((observer) => observer.nodes.size === 0)).toBe(true)
 })

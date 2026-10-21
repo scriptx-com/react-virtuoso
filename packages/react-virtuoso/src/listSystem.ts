@@ -111,7 +111,9 @@ export const listSystem = u.system(
     // Use Virtuoso's existing scroll correction channel in either direction.
     let geometryAnchor: { index: number; within: number; scrollTop: number } | undefined
     u.subscribe(beforeKnownLayoutChange, () => {
-      geometryAnchor = undefined
+      if (geometryAnchor) {
+        return
+      }
       const scrollTop = u.getValue(domIO.statefulScrollTop)
       const tree = u.getValue(sizes).offsetTree
       const position = scrollTop - u.getValue(domIO.headerHeight) - u.getValue(domIO.fixedHeaderHeight)
@@ -132,7 +134,10 @@ export const listSystem = u.system(
       }
       geometryAnchor = { index, within: position - offsetOf(index, tree, itemGap), scrollTop }
     })
-    u.subscribe(afterKnownLayoutChange, () => {
+    const restoreGeometryAnchor = () => {
+      if (!u.getValue(featureGroup1.propsReady)) {
+        return
+      }
       const anchor = geometryAnchor
       geometryAnchor = undefined
       const tree = u.getValue(sizes).offsetTree
@@ -148,6 +153,12 @@ export const listSystem = u.system(
       const delta = target - anchor.scrollTop
       if (delta !== 0) {
         u.publish(domIO.scrollBy, { top: delta, behavior: 'auto' })
+      }
+    }
+    u.subscribe(afterKnownLayoutChange, restoreGeometryAnchor)
+    u.subscribe(featureGroup1.propsReady, (ready) => {
+      if (ready) {
+        restoreGeometryAnchor()
       }
     })
 

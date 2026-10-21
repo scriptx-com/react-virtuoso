@@ -326,6 +326,7 @@ export const sizeSystem = u.system(
     const beforeKnownLayoutChange = u.stream<void>()
     const afterKnownLayoutChange = u.stream<void>()
     const knownLayoutChanging = u.statefulStream(false)
+    const geometryRevision = u.statefulStream(0)
     let geometryManaged = false
     let lastLayoutInput: KnownLayout | undefined
 
@@ -335,6 +336,7 @@ export const sizeSystem = u.system(
           ? { revision: input.revision, ranges: input.ranges.map((range) => ({ ...range })) }
           : undefined
       u.publish(knownLayoutChanging, true)
+      u.publish(geometryRevision, u.getValue(geometryRevision) + 1)
       u.publish(beforeKnownLayoutChange, undefined)
       u.publish(knownLayout, layout)
       const fallback = u.getValue(defaultItemSize) ?? u.getValue(sizes).lastSize
@@ -758,6 +760,7 @@ export const sizeSystem = u.system(
       beforeKnownLayoutChange,
       afterKnownLayoutChange,
       knownLayoutChanging,
+      geometryRevision,
       beforeUnshiftWith,
       // input
       data,

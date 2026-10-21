@@ -150,9 +150,14 @@ it.each([
   expect(reads).toContain('offsetWidth')
 })
 
-it('continues correcting item sizes from browser observations after initialization', async () => {
-  await renderList({ initialGeometry: geometry, itemSize: () => 120 })
+it.each([false, true])('continues correcting item sizes after initialization (recycling=%s)', async (recycling) => {
+  await renderList({ initialGeometry: geometry, itemSize: () => 120, recycling })
   await notifyList()
+  await act(async () => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve())
+    })
+  })
   expect(reads).toContain('scrollWidth')
   expect(host.querySelector('[data-index="0"]')?.getAttribute('data-known-size')).toBe('120')
 })

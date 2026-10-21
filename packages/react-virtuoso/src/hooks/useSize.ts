@@ -1,5 +1,7 @@
 import React from 'react'
 
+import { useRecyclingActivity } from '../recycling/RecyclingContext'
+
 export type CallbackRefParam = HTMLElement | null
 
 export default function useSize(callback: (e: HTMLElement) => void, enabled: boolean, skipAnimationFrame: boolean) {
@@ -7,6 +9,7 @@ export default function useSize(callback: (e: HTMLElement) => void, enabled: boo
 }
 
 export function useSizeWithElRef(callback: (e: HTMLElement) => void, enabled: boolean, skipAnimationFrame: boolean) {
+  const active = useRecyclingActivity()
   const ref = React.useRef<CallbackRefParam>(null)
   const owner = React.useRef<ResizeObserver | null>(null)
 
@@ -28,7 +31,7 @@ export function useSizeWithElRef(callback: (e: HTMLElement) => void, enabled: bo
 
   const callbackRef = React.useCallback(
     (el: CallbackRefParam) => {
-      const next = el && enabled ? el : null
+      const next = el && enabled && active ? el : null
       if (ref.current === next) {
         return
       }
@@ -41,7 +44,7 @@ export function useSizeWithElRef(callback: (e: HTMLElement) => void, enabled: bo
         observer?.observe(next)
       }
     },
-    [observer, enabled]
+    [observer, enabled, active]
   )
 
   return { callbackRef, ref }

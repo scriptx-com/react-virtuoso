@@ -11,7 +11,7 @@ test.describe('list with hundred items', () => {
   test('renders only 6 items', async ({ page }) => {
     const itemCount = await page.evaluate(() => {
       const listContainer = document.querySelector('[data-testid=virtuoso-item-list]')!
-      return listContainer.childElementCount
+      return listContainer.querySelectorAll('[data-index]').length
     })
     expect(itemCount).toBe(6)
   })

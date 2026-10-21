@@ -3,6 +3,7 @@ import { domIOSystem } from './domIOSystem'
 import { DOWN, UP } from './stateFlagsSystem'
 import * as u from './urx'
 
+import type { PixelWindow } from './recycling/integration'
 import type { ScrollDirection } from './stateFlagsSystem'
 
 export type NumberTuple = [number, number]
@@ -34,6 +35,7 @@ export const sizeRangeSystem = u.system(
     const topListHeight = u.statefulStream(0)
     const increaseViewportBy = u.statefulStream<ViewportIncrease>(0)
     const overscan = u.statefulStream<Overscan>(0)
+    const recyclingWindow = u.statefulStream<PixelWindow | undefined>(undefined)
 
     const visibleRange = u.statefulStreamFromEmitter(
       u.pipe(
@@ -46,7 +48,8 @@ export const sizeRangeSystem = u.system(
           u.duc(topListHeight),
           u.duc(fixedHeaderHeight),
           u.duc(deviation),
-          u.duc(increaseViewportBy)
+          u.duc(increaseViewportBy),
+          recyclingWindow
         ),
         u.map(
           ([
@@ -59,8 +62,16 @@ export const sizeRangeSystem = u.system(
             fixedHeaderHeight,
             deviation,
             increaseViewportBy,
+            recyclingWindow,
           ]) => {
             const top = scrollTop - deviation
+            if (recyclingWindow) {
+              const origin = headerHeight + fixedHeaderHeight + deviation
+              return [
+                Math.max(0, Math.min(recyclingWindow.start, scrollTop) - origin),
+                Math.max(0, Math.max(recyclingWindow.end, scrollTop + viewportHeight) - origin),
+              ] as NumberTuple
+            }
             const stickyHeaderHeight = topListHeight + fixedHeaderHeight
             const headerVisible = Math.max(headerHeight - top, 0)
             let direction: ChangeDirection = NONE
@@ -103,6 +114,7 @@ export const sizeRangeSystem = u.system(
 
     return {
       increaseViewportBy,
+      recyclingWindow,
       // input
       listBoundary,
       overscan,

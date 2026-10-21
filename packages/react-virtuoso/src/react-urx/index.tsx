@@ -192,7 +192,10 @@ export interface SystemPropsMap<SS extends AnySystemSpec, K = keyof SR<SS>, D = 
 export function systemToComponent<SS extends AnySystemSpec, M extends SystemPropsMap<SS>, S extends SR<SS>, R>(
   systemSpec: SS,
   map: M,
-  Root?: R
+  Root?: R,
+  useIntegration: () =>
+    | { apply: (system: SR<SS>, props?: Record<string, unknown>) => void; subscribe: (system: SR<SS>) => () => void }
+    | undefined = () => undefined
 ) {
   type ContextValue = ReturnType<SS['constructor']>
   const requiredPropNames = Object.keys(map.required || {})
@@ -208,7 +211,7 @@ export function systemToComponent<SS extends AnySystemSpec, M extends SystemProp
 
   type CompMethods = MethodsFromPropMap<SS, M>
 
-  function applyPropsToSystem(system: ContextValue, props: any, initializing = false) {
+  function applyPropsToSystem(system: ContextValue, props: any, initializing = false, integration?: ReturnType<typeof useIntegration>) {
     if (system.propsReady !== undefined) {
       u.publish(system.propsReady, false)
     }
@@ -228,6 +231,7 @@ export function systemToComponent<SS extends AnySystemSpec, M extends SystemProp
     if (initializing) {
       seedInitialGeometry(system, props)
     }
+    integration?.apply(system, props)
     if (system.propsReady !== undefined) {
       u.publish(system.propsReady, true)
     }
@@ -256,10 +260,11 @@ export function systemToComponent<SS extends AnySystemSpec, M extends SystemProp
 
   const Component = React.forwardRef<CompMethods, CompProps>(function SystemComponent(propsWithChildren, ref) {
     const { children, ...props } = propsWithChildren as any
+    const integration = useIntegration()
 
     const [system] = React.useState(() => {
       return u.tap(u.init(systemSpec), (system) => {
-        applyPropsToSystem(system, props, true)
+        applyPropsToSystem(system, props, true, integration)
       })
     })
 
@@ -277,8 +282,9 @@ export function systemToComponent<SS extends AnySystemSpec, M extends SystemProp
     }, [props, handlers, system])
 
     useIsomorphicLayoutEffect(() => {
-      applyPropsToSystem(system, props)
+      applyPropsToSystem(system, props, false, integration)
     })
+    useIsomorphicLayoutEffect(() => integration?.subscribe(system), [integration, system])
 
     React.useImperativeHandle(ref, u.always(buildMethods(system)))
 

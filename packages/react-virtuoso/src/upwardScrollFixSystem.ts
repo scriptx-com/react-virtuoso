@@ -14,7 +14,7 @@ const isMobileSafari = simpleMemoize(() => {
   return /iP(ad|od|hone)/i.test(navigator.userAgent) && /WebKit/i.test(navigator.userAgent)
 })
 
-type UpwardFixState = [number, ListItem<any>[], number, number]
+type UpwardFixState = [number, ListItem<any>[], number, number, number]
 /**
  * Fixes upward scrolling by calculating and compensation from changed item heights, using scrollBy.
  */
@@ -23,20 +23,23 @@ export const upwardScrollFixSystem = u.system(
     { deviation, scrollBy, scrollingInProgress, scrollTop },
     { isAtBottom, isScrolling, lastJumpDueToItemResize, scrollDirection },
     { listState },
-    { beforeUnshiftWith, gap, shiftWithOffset, sizes, knownLayoutChanging },
+    { beforeUnshiftWith, gap, shiftWithOffset, sizes, knownLayoutChanging, geometryRevision },
     { log },
     { recalcInProgress },
   ]) => {
     const deviationOffset = u.streamFromEmitter(
       u.pipe(
         listState,
-        u.withLatestFrom(lastJumpDueToItemResize),
+        u.withLatestFrom(lastJumpDueToItemResize, geometryRevision),
         u.scan(
-          ([, prevItems, prevTotalCount, prevTotalHeight], [{ bottom, items, offsetBottom, totalCount }, lastJumpDueToItemResize]) => {
+          (
+            [, prevItems, prevTotalCount, prevTotalHeight, previousRevision],
+            [{ bottom, items, offsetBottom, totalCount }, lastJumpDueToItemResize, revision]
+          ) => {
             const totalHeight = bottom + offsetBottom
 
             let newDev = 0
-            if (prevTotalCount === totalCount) {
+            if (prevTotalCount === totalCount && previousRevision === revision) {
               if (prevItems.length > 0 && items.length > 0) {
                 const atStart = items[0]!.originalIndex === 0 && prevItems[0]!.originalIndex === 0
                 if (!atStart) {
@@ -48,9 +51,9 @@ export const upwardScrollFixSystem = u.system(
               }
             }
 
-            return [newDev, items, totalCount, totalHeight] as UpwardFixState
+            return [newDev, items, totalCount, totalHeight, revision] as UpwardFixState
           },
-          [0, [], 0, 0] as UpwardFixState
+          [0, [], 0, 0, 0] as UpwardFixState
         ),
         u.filter(([amount]) => amount !== 0),
         u.withLatestFrom(scrollTop, scrollDirection, scrollingInProgress, isAtBottom, log, recalcInProgress, knownLayoutChanging),

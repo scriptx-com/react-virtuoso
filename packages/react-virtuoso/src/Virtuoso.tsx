@@ -8,6 +8,8 @@ import useWindowViewportRectRef from './hooks/useWindowViewportRect'
 import { listSystem } from './listSystem'
 import { systemToComponent } from './react-urx'
 import { coversKnownRange } from './recycling/layout'
+import { RecycledItems } from './recycling/RecycledItems'
+import { useRecyclingSystemBinding } from './recycling/systemBinding'
 import * as u from './urx'
 import { VirtuosoMockContext } from './utils/context'
 import { correctItemSize } from './utils/correctItemSize'
@@ -27,6 +29,11 @@ const listComponentPropsSystem = /*#__PURE__*/ u.system(() => {
   const computeItemKey = u.statefulStream<ComputeItemKey<any, any>>(identity)
   const HeaderFooterTag = u.statefulStream('div')
   const scrollerRef = u.statefulStream<(ref: HTMLElement | null | Window) => void>(u.noop)
+  const recycling = u.statefulStream<boolean | undefined>(undefined)
+  const getItemType = u.statefulStream<((item: any, index: number) => number | string | undefined) | undefined>(undefined)
+  const integrationFocusedKey = u.statefulStream<React.Key | null>(null)
+  const domFocusedKey = u.statefulStream<React.Key | null>(null)
+  const recyclingActive = u.statefulStream(true)
 
   const distinctProp = <K extends keyof Components<any>>(propName: K, defaultValue: 'div' | Components<any>[K] | null = null) => {
     return u.statefulStreamFromEmitter(
@@ -40,6 +47,11 @@ const listComponentPropsSystem = /*#__PURE__*/ u.system(() => {
   }
 
   return {
+    recycling,
+    getItemType,
+    integrationFocusedKey,
+    domFocusedKey,
+    recyclingActive,
     components,
     computeItemKey,
     EmptyPlaceholder: distinctProp('EmptyPlaceholder'),
@@ -94,6 +106,18 @@ const itemListKeys = [
   'alignToBottom',
   'initialItemFinalLocationReached',
   'knownLayout',
+  'recycling',
+  'getItemType',
+  'integrationFocusedKey',
+  'domFocusedKey',
+  'recyclingActive',
+  'followOutput',
+  'scrollSeekConfiguration',
+  'topItemCount',
+  'data',
+  'sizes',
+  'gap',
+  'fixedItemHeight',
 ] as const
 
 const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = false }: { showTopList?: boolean }) {
@@ -120,7 +144,39 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
     alignToBottom,
     initialItemFinalLocationReached,
     knownLayout,
+    recycling,
+    getItemType,
+    integrationFocusedKey,
+    domFocusedKey,
+    recyclingActive,
+    followOutput,
+    scrollSeekConfiguration,
+    topItemCount,
+    data,
+    sizes,
+    gap,
+    fixedItemHeight,
   ] = useEmitterValues(itemListKeys)
+  const setDomFocusedKey = usePublisher('domFocusedKey')
+  const supportsRecycling =
+    !showTopList &&
+    groupIndices.length === 0 &&
+    topItemCount === 0 &&
+    (followOutput === false || followOutput === undefined) &&
+    !alignToBottom &&
+    (scrollSeekConfiguration === false || scrollSeekConfiguration === undefined) &&
+    listState.firstItemIndex === 0 &&
+    !useWindowScroll &&
+    !customScrollParent
+  const warnedUnsupported = React.useRef(false)
+  React.useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' && recycling === true && !supportsRecycling && !showTopList && !warnedUnsupported.current) {
+      warnedUnsupported.current = true
+      console.warn('Virtuoso recycling is unavailable for this list configuration; using ordinary virtualization.')
+    }
+  }, [recycling, supportsRecycling, showTopList])
+  const recycle = recycling !== false && supportsRecycling && sizes.offsetTree.length > 0
+  const [rtl, setRtl] = React.useState(false)
   const sizeRanges = usePublisher('sizeRanges')
   const windowScrollContainerStateCallback = usePublisher('windowScrollContainerState')
   const _scrollContainerStateCallback = usePublisher('scrollContainerState')
@@ -131,7 +187,7 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
   const { callbackRef } = useChangedListContentsSizes(
     sizeRanges,
     itemSize,
-    trackItemSizes,
+    recyclingActive && (trackItemSizes || recycle),
     showTopList ? u.noop : scrollContainerStateCallback,
     log,
     listGap,
@@ -139,9 +195,19 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
     horizontalDirection,
     skipAnimationFrame,
     knownLayout,
-    !showTopList &&
-      listState.items.length > 0 &&
-      coversKnownRange(knownLayout, listState.items[0]!.originalIndex!, listState.items[listState.items.length - 1]!.originalIndex!)
+    recycle ||
+      (!showTopList &&
+        listState.items.length > 0 &&
+        coversKnownRange(knownLayout, listState.items[0]!.originalIndex!, listState.items[listState.items.length - 1]!.originalIndex!))
+  )
+  const listRef = React.useCallback(
+    (element: HTMLElement | null) => {
+      callbackRef(element)
+      if (element && horizontalDirection) {
+        setRtl(getComputedStyle(element).direction === 'rtl')
+      }
+    },
+    [callbackRef, horizontalDirection]
   )
 
   const [deviation, setDeviation] = React.useState(0)
@@ -165,6 +231,7 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
         ...(horizontalDirection
           ? {
               display: 'inline-block',
+              verticalAlign: 'top',
               height: '100%',
               // Use physical properties (marginLeft / paddingLeft / paddingRight)
               // instead of CSS logical properties (marginInlineStart /
@@ -179,8 +246,8 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
               // same layout in LTR (which is the only writing mode this fork
               // targets) and work on every Chromium version.
               marginLeft: deviation !== 0 ? deviation : alignToBottom ? 'auto' : 0,
-              paddingRight: listState.offsetBottom,
-              paddingLeft: listState.offsetTop,
+              paddingRight: rtl ? listState.offsetTop : listState.offsetBottom,
+              paddingLeft: rtl ? listState.offsetBottom : listState.offsetTop,
               whiteSpace: 'nowrap',
             }
           : {
@@ -195,11 +262,41 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
     return <EmptyPlaceholder {...contextPropIfNotDomElement(EmptyPlaceholder, context)} />
   }
 
+  if (recycle) {
+    return (
+      <RecycledItems
+        items={listState.items}
+        data={data}
+        totalCount={listState.totalCount}
+        firstItemIndex={listState.firstItemIndex}
+        totalSize={listState.bottom + listState.offsetBottom}
+        horizontal={horizontalDirection}
+        rtl={rtl}
+        sizes={sizes}
+        gap={gap}
+        knownLayout={knownLayout}
+        fixedItemSize={fixedItemHeight}
+        computeItemKey={computeItemKey}
+        getItemType={getItemType}
+        itemContent={itemContent as ItemContent<any, any>}
+        ItemComponent={ItemComponent as React.ElementType}
+        ListComponent={ListComponent as React.ElementType}
+        context={context}
+        itemSize={itemSize}
+        sizeRanges={sizeRanges}
+        listRef={listRef}
+        listStyle={containerStyle}
+        focusedKey={integrationFocusedKey ?? domFocusedKey}
+        onFocusedItem={setDomFocusedKey}
+      />
+    )
+  }
+
   return (
     <ListComponent
       {...contextPropIfNotDomElement(ListComponent, context)}
       data-testid={showTopList ? 'virtuoso-top-item-list' : 'virtuoso-item-list'}
-      ref={callbackRef}
+      ref={listRef}
       style={containerStyle}
     >
       {(showTopList ? listState.topItems : listState.items).map((item) => {
@@ -300,23 +397,26 @@ export function itemPropIfNotDomElement(element: unknown, item: unknown) {
   return { item: typeof element === 'string' ? undefined : item }
 }
 
+const HORIZONTAL_HEADER_FOOTER_STYLE: React.CSSProperties = { display: 'inline-block', height: '100%', verticalAlign: 'top' }
+
 const Header: React.FC = /*#__PURE__*/ React.memo(function VirtuosoHeader() {
   const Header = useEmitterValue('HeaderComponent')
   const headerHeight = usePublisher('headerHeight')
   const HeaderFooterTag = useEmitterValue('HeaderFooterTag') as any
+  const horizontalDirection = useEmitterValue('horizontalDirection')
   const ref = useSize(
     React.useMemo(
       () => (el) => {
-        headerHeight(correctItemSize(el, 'height'))
+        headerHeight(correctItemSize(el, horizontalDirection ? 'width' : 'height'))
       },
-      [headerHeight]
+      [headerHeight, horizontalDirection]
     ),
     true,
     useEmitterValue('skipAnimationFrameInResizeObserver')
   )
   const context = useEmitterValue('context')
   return Header !== null && Header !== undefined ? (
-    <HeaderFooterTag ref={ref}>
+    <HeaderFooterTag ref={ref} style={horizontalDirection ? HORIZONTAL_HEADER_FOOTER_STYLE : undefined}>
       <Header {...contextPropIfNotDomElement(Header, context)} />
     </HeaderFooterTag>
   ) : null
@@ -326,19 +426,20 @@ const Footer: React.FC = /*#__PURE__*/ React.memo(function VirtuosoFooter() {
   const Footer = useEmitterValue('FooterComponent')
   const footerHeight = usePublisher('footerHeight')
   const HeaderFooterTag = useEmitterValue('HeaderFooterTag') as any
+  const horizontalDirection = useEmitterValue('horizontalDirection')
   const ref = useSize(
     React.useMemo(
       () => (el) => {
-        footerHeight(correctItemSize(el, 'height'))
+        footerHeight(correctItemSize(el, horizontalDirection ? 'width' : 'height'))
       },
-      [footerHeight]
+      [footerHeight, horizontalDirection]
     ),
     true,
     useEmitterValue('skipAnimationFrameInResizeObserver')
   )
   const context = useEmitterValue('context')
   return Footer !== null && Footer !== undefined ? (
-    <HeaderFooterTag ref={ref}>
+    <HeaderFooterTag ref={ref} style={horizontalDirection ? HORIZONTAL_HEADER_FOOTER_STYLE : undefined}>
       <Footer {...contextPropIfNotDomElement(Footer, context)} />
     </HeaderFooterTag>
   ) : null
@@ -452,7 +553,11 @@ const Viewport: React.FC<React.PropsWithChildren> = ({ children }) => {
   }, [ctx, viewportHeight, fixedItemHeight])
 
   return (
-    <div data-viewport-type="element" ref={viewportRef} style={viewportStyle(alignToBottom)}>
+    <div
+      data-viewport-type="element"
+      ref={viewportRef}
+      style={{ ...viewportStyle(alignToBottom), ...(horizontalDirection ? { whiteSpace: 'nowrap' } : {}) }}
+    >
       {children}
     </div>
   )
@@ -532,6 +637,8 @@ export const {
   {
     optional: {
       restoreStateFrom: 'restoreStateFrom',
+      recycling: 'recycling',
+      getItemType: 'getItemType',
       context: 'context',
       followOutput: 'followOutput',
       scrollIntoViewOnChange: 'scrollIntoViewOnChange',
@@ -588,7 +695,8 @@ export const {
       groupIndices: 'groupIndices',
     },
   },
-  ListRoot
+  ListRoot,
+  useRecyclingSystemBinding
 )
 
 const Scroller = /*#__PURE__*/ buildScroller({ useEmitter, useEmitterValue, usePublisher }, true)

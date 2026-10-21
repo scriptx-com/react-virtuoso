@@ -29,6 +29,40 @@ export interface ListState {
 
 export type MinOverscanItemCount = number | { bottom: number; top: number }
 
+function sameItems(a: ListItems, b: ListItems) {
+  return (
+    a.length === b.length &&
+    a.every((item, index) => {
+      const other = b[index]!
+      return (
+        item.index === other.index &&
+        item.originalIndex === other.originalIndex &&
+        item.offset === other.offset &&
+        item.size === other.size &&
+        item.data === other.data &&
+        item.type === other.type &&
+        (item.type === 'group' || other.type === 'group' || item.groupIndex === other.groupIndex)
+      )
+    })
+  )
+}
+
+function sameListState(a: ListState | undefined, b: ListState) {
+  return (
+    a === b ||
+    (a !== undefined &&
+      a.bottom === b.bottom &&
+      a.top === b.top &&
+      a.offsetBottom === b.offsetBottom &&
+      a.offsetTop === b.offsetTop &&
+      a.totalCount === b.totalCount &&
+      a.firstItemIndex === b.firstItemIndex &&
+      a.topListHeight === b.topListHeight &&
+      sameItems(a.items, b.items) &&
+      sameItems(a.topItems, b.topItems))
+  )
+}
+
 function probeItemSet(index: number, sizes: SizeState, data: Data) {
   if (hasGroups(sizes)) {
     const itemIndex = originalIndexFromItemIndex(index, sizes)
@@ -189,7 +223,7 @@ export const listStateSystem = u.system(
     { initialItemFinalLocationReached, initialTopMostItemIndex, scrolledToInitialItem },
     { topListHeight },
     stateFlags,
-    { didMount },
+    { propsReady },
     { recalcInProgress },
   ]) => {
     const topItemsIndexes = u.statefulStream<number[]>([])
@@ -202,7 +236,7 @@ export const listStateSystem = u.system(
     const listState = u.statefulStreamFromEmitter(
       u.pipe(
         u.combineLatest(
-          didMount,
+          propsReady,
           recalcInProgress,
           u.duc(visibleRange, tupleComparator),
           u.duc(totalCount),
@@ -443,7 +477,7 @@ export const listStateSystem = u.system(
         ),
         //@ts-expect-error filter needs to be fixed
         u.filter((value) => value !== null),
-        u.distinctUntilChanged()
+        u.distinctUntilChanged(sameListState)
       ),
       EMPTY_LIST_STATE
     )

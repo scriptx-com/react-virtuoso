@@ -11,12 +11,12 @@ export function Example() {
     <>
       <Virtuoso
         components={{
-          Item: ({ children, ...props }) => (
-            <div {...props} style={{ border: '1px solid red' }}>
+          Item: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ children, style, ...props }, ref) => (
+            <div {...props} ref={ref} style={{ ...style, border: '1px solid red' }}>
               {children}
             </div>
-          ),
-          List: React.forwardRef(({ children, style, ...props }, ref) => (
+          )),
+          List: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ children, style, ...props }, ref) => (
             <div ref={ref} style={{ ...style, background: 'grey', display: 'flex', flexDirection: 'column', gap: 20 }} {...props}>
               {children}
             </div>

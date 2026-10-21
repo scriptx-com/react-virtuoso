@@ -156,6 +156,15 @@ export interface VirtuosoHandle {
  */
 export interface VirtuosoProps<Data, Context> extends ListRootProps {
   /**
+   * Reuse compatible offscreen cells in ordinary, internally scrolled lists (default true).
+   * Grouped/top-item, inverse, bottom-aligned, follow-output, scroll-seek and external-scroller modes retain ordinary virtualization.
+   * Custom Item/List hosts must forward their refs, styles and supplied attributes.
+   * Reusable content must reset item-local state and effects when logical identity changes; useRecyclingState helps with state.
+   */
+  recycling?: boolean
+  /** Optional compatibility category used when assigning a recycled cell. */
+  getItemType?: (item: Data, index: number) => number | string | undefined
+  /**
    * Setting `alignToBottom` to `true` aligns the items to the bottom of the list if the list is shorter than the viewport.
    * Use `followOutput` property to keep the list aligned when new items are appended.
    */
