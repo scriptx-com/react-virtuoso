@@ -83,3 +83,14 @@ describe('trusted geometry', () => {
     expect(getChangedChildSizes(parent.children, () => 100, 'offsetWidth', vi.fn())).toBeNull()
   })
 })
+
+it('does not learn an unfinished nested rail height', () => {
+  const parent = document.createElement('div')
+  parent.innerHTML = '<div data-index="0" data-known-size="0" data-virtuoso-measurement-pending=""></div>'
+  const reader = vi.fn(() => 88)
+  expect(getChangedChildSizes(parent.children, reader, 'offsetHeight', vi.fn())).toBeNull()
+  expect(reader).not.toHaveBeenCalled()
+  parent.firstElementChild!.removeAttribute('data-virtuoso-measurement-pending')
+  reader.mockReturnValue(490)
+  expect(getChangedChildSizes(parent.children, reader, 'offsetHeight', vi.fn())).toEqual([{ startIndex: 0, endIndex: 0, size: 490 }])
+})

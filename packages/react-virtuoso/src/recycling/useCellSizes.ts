@@ -52,7 +52,7 @@ export function createCellSizeObserver({
     }
     const changed: SizeRange[] = []
     for (const [element, binding] of pending) {
-      if (bindings.get(element) !== binding) {
+      if (bindings.get(element) !== binding || element.hasAttribute('data-virtuoso-measurement-pending')) {
         continue
       }
       // Read current natural geometry, not ResizeObserverEntry's potentially stale size.
@@ -78,6 +78,17 @@ export function createCellSizeObserver({
       }
     }
     callback(ranges)
+  }
+
+  const ready = (event: Event) => {
+    const element = event.currentTarget as HTMLElement
+    if (event.target !== element) {
+      return
+    }
+    const binding = bindings.get(element)
+    if (binding) {
+      queue(element, binding)
+    }
   }
 
   const observer = createObserver((entries) => {
@@ -127,6 +138,7 @@ export function createCellSizeObserver({
         bindings.set(cell.element, binding)
         if (!previous) {
           observer.observe(cell.element)
+          cell.element.addEventListener('virtuoso-measurement-ready', ready)
         }
         queue(cell.element, binding)
       }
@@ -135,6 +147,7 @@ export function createCellSizeObserver({
           continue
         }
         observer.unobserve(element)
+        element.removeEventListener('virtuoso-measurement-ready', ready)
         bindings.delete(element)
         pending.delete(element)
       }
@@ -145,6 +158,9 @@ export function createCellSizeObserver({
         cancel(frame)
       }
       observer.disconnect()
+      for (const element of bindings.keys()) {
+        element.removeEventListener('virtuoso-measurement-ready', ready)
+      }
       bindings.clear()
       pending.clear()
     },

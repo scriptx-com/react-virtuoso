@@ -155,3 +155,22 @@ it('republishes unchanged DOM size when dataset invalidation resets engine geome
   expect(h.itemSize).toHaveBeenCalledTimes(1)
   h.manager.destroy()
 })
+
+it('waits for nested measurement readiness and retries without a resize', () => {
+  const h = setup()
+  const target = cell(0, 88, { knownSize: 0 })
+  target.element.setAttribute('data-virtuoso-measurement-pending', '')
+  h.manager.setCells([target])
+  h.flush()
+  expect(h.callback).not.toHaveBeenCalled()
+  expect(h.itemSize).not.toHaveBeenCalled()
+  target.element.textContent = '490'
+  target.element.removeAttribute('data-virtuoso-measurement-pending')
+  target.element.dispatchEvent(new Event('virtuoso-measurement-ready', { bubbles: true }))
+  h.flush()
+  expect(h.callback).toHaveBeenCalledExactlyOnceWith([{ startIndex: 0, endIndex: 0, size: 490 }])
+  h.manager.destroy()
+  target.element.dispatchEvent(new Event('virtuoso-measurement-ready', { bubbles: true }))
+  h.flush()
+  expect(h.callback).toHaveBeenCalledTimes(1)
+})

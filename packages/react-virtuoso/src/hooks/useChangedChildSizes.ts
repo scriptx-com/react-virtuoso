@@ -2,6 +2,7 @@ import React from 'react'
 
 import { LogLevel } from '../loggerSystem'
 import { knownSizeAt } from '../recycling/layout'
+import { useRecyclingActivity } from '../recycling/RecyclingContext'
 import { getLogicalScrollLeft } from '../utils/horizontalScroll'
 import { useSizeWithElRef } from './useSize'
 
@@ -97,7 +98,34 @@ export default function useChangedListContentsSizes(
     [callback, itemSize, log, gap, customScrollParent, scrollContainerStateCallback, horizontalDirection, knownLayout, allItemsKnown]
   )
 
-  return useSizeWithElRef(memoedCallback, enabled, skipAnimationFrame)
+  const active = useRecyclingActivity()
+  const measurement = useSizeWithElRef(memoedCallback, enabled, skipAnimationFrame)
+  React.useLayoutEffect(() => {
+    const element = measurement.ref.current
+    if (!element) {
+      return
+    }
+    let frame: number | undefined
+    const ready = (event: Event) => {
+      if ((event.target as HTMLElement).parentElement !== element || frame !== undefined) {
+        return
+      }
+      frame = requestAnimationFrame(() => {
+        frame = undefined
+        if (measurement.ref.current === element && element.offsetParent !== null) {
+          memoedCallback(element)
+        }
+      })
+    }
+    element.addEventListener('virtuoso-measurement-ready', ready)
+    return () => {
+      element.removeEventListener('virtuoso-measurement-ready', ready)
+      if (frame !== undefined) {
+        cancelAnimationFrame(frame)
+      }
+    }
+  }, [measurement.ref, memoedCallback, enabled, active])
+  return measurement
 }
 
 export function getChangedChildSizes(
@@ -118,7 +146,7 @@ export function getChangedChildSizes(
   for (let i = 0; i < length; i++) {
     const child = children.item(i) as HTMLElement
 
-    if (child.dataset.index === undefined) {
+    if (child.dataset.index === undefined || child.hasAttribute('data-virtuoso-measurement-pending')) {
       continue
     }
 
