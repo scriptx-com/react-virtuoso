@@ -1,11 +1,14 @@
 import React from 'react'
 
 import { LogLevel } from '../loggerSystem'
+import { knownSizeAt } from '../recycling/layout'
+import { useRecyclingActivity } from '../recycling/RecyclingContext'
 import { getLogicalScrollLeft } from '../utils/horizontalScroll'
 import { useSizeWithElRef } from './useSize'
 
 import type { ScrollContainerState, SizeFunction, SizeRange } from '../interfaces'
 import type { Log } from '../loggerSystem'
+import type { KnownLayout } from '../recycling/layout'
 export default function useChangedListContentsSizes(
   callback: (ranges: SizeRange[]) => void,
   itemSize: SizeFunction,
@@ -15,11 +18,15 @@ export default function useChangedListContentsSizes(
   gap: ((gap: number) => void) | undefined,
   customScrollParent: HTMLElement | undefined,
   horizontalDirection: boolean,
-  skipAnimationFrame: boolean
+  skipAnimationFrame: boolean,
+  knownLayout?: KnownLayout,
+  allItemsKnown = false
 ) {
   const memoedCallback = React.useCallback(
     (el: HTMLElement) => {
-      const ranges = getChangedChildSizes(el.children, itemSize, horizontalDirection ? 'offsetWidth' : 'offsetHeight', log)
+      const ranges = allItemsKnown
+        ? null
+        : getChangedChildSizes(el.children, itemSize, horizontalDirection ? 'offsetWidth' : 'offsetHeight', log, knownLayout)
       let scrollableElement = el.parentElement!
 
       while (scrollableElement.dataset.virtuosoScroller === undefined) {
@@ -68,29 +75,66 @@ export default function useChangedListContentsSizes(
             ? getLogicalScrollLeft(scrollableElement, scrollableElement.scrollLeft)
             : scrollableElement.scrollTop
 
+      const measuredGap = gap
+        ? horizontalDirection
+          ? resolveGapValue('column-gap', getComputedStyle(el).columnGap, log)
+          : resolveGapValue('row-gap', getComputedStyle(el).rowGap, log)
+        : undefined
+
       scrollContainerStateCallback({
         scrollHeight,
         scrollTop: Math.max(scrollTop, 0),
         viewportHeight,
       })
 
-      gap?.(
-        horizontalDirection
-          ? resolveGapValue('column-gap', getComputedStyle(el).columnGap, log)
-          : resolveGapValue('row-gap', getComputedStyle(el).rowGap, log)
-      )
+      if (measuredGap !== undefined) {
+        gap?.(measuredGap)
+      }
 
       if (ranges !== null) {
         callback(ranges)
       }
     },
-    [callback, itemSize, log, gap, customScrollParent, scrollContainerStateCallback, horizontalDirection]
+    [callback, itemSize, log, gap, customScrollParent, scrollContainerStateCallback, horizontalDirection, knownLayout, allItemsKnown]
   )
 
-  return useSizeWithElRef(memoedCallback, enabled, skipAnimationFrame)
+  const active = useRecyclingActivity()
+  const measurement = useSizeWithElRef(memoedCallback, enabled, skipAnimationFrame)
+  React.useLayoutEffect(() => {
+    const element = measurement.ref.current
+    if (!element) {
+      return
+    }
+    let frame: number | undefined
+    const ready = (event: Event) => {
+      if ((event.target as HTMLElement).parentElement !== element || frame !== undefined) {
+        return
+      }
+      frame = requestAnimationFrame(() => {
+        frame = undefined
+        if (measurement.ref.current === element && element.offsetParent !== null) {
+          memoedCallback(element)
+        }
+      })
+    }
+    element.addEventListener('virtuoso-measurement-ready', ready)
+    return () => {
+      element.removeEventListener('virtuoso-measurement-ready', ready)
+      if (frame !== undefined) {
+        cancelAnimationFrame(frame)
+      }
+    }
+  }, [measurement.ref, memoedCallback, enabled, active])
+  return measurement
 }
 
-function getChangedChildSizes(children: HTMLCollection, itemSize: SizeFunction, field: 'offsetHeight' | 'offsetWidth', log: Log) {
+export function getChangedChildSizes(
+  children: HTMLCollection,
+  itemSize: SizeFunction,
+  field: 'offsetHeight' | 'offsetWidth',
+  log: Log,
+  knownLayout?: KnownLayout
+) {
   const length = children.length
 
   if (length === 0) {
@@ -102,11 +146,14 @@ function getChangedChildSizes(children: HTMLCollection, itemSize: SizeFunction, 
   for (let i = 0; i < length; i++) {
     const child = children.item(i) as HTMLElement
 
-    if (child.dataset.index === undefined) {
+    if (child.dataset.index === undefined || child.hasAttribute('data-virtuoso-measurement-pending')) {
       continue
     }
 
     const index = parseInt(child.dataset.index)
+    if (knownSizeAt(knownLayout, index) !== undefined) {
+      continue
+    }
     const knownSize = parseFloat(child.dataset.knownSize!)
     const size = itemSize(child, field)
 
@@ -126,7 +173,7 @@ function getChangedChildSizes(children: HTMLCollection, itemSize: SizeFunction, 
     }
   }
 
-  return results
+  return results.length ? results : null
 }
 
 function resolveGapValue(property: string, value: string | undefined, log: Log) {

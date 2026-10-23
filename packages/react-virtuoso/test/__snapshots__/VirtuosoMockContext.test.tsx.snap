@@ -127,14 +127,16 @@ exports[`VirtuosoMockContext > List > correctly renders items 1`] = `
       style="height: 100%; position: absolute; top: 0px; width: 100%;"
     >
       <div
+        data-recycling-list=""
         data-testid="virtuoso-item-list"
-        style="box-sizing: border-box; margin-top: 0px; padding-top: 0px; padding-bottom: 500px;"
+        style="box-sizing: border-box; margin-top: 0px; position: relative; padding: 0px; height: 800px;"
       >
         <div
           data-index="0"
           data-item-index="0"
           data-known-size="100"
-          style="overflow-anchor: none;"
+          data-recycling-slot="0"
+          style="position: absolute; box-sizing: border-box; overflow-anchor: none; top: 0px; left: 0px; width: 100%; height: 100px;"
         >
           Item 0
         </div>
@@ -142,7 +144,8 @@ exports[`VirtuosoMockContext > List > correctly renders items 1`] = `
           data-index="1"
           data-item-index="1"
           data-known-size="100"
-          style="overflow-anchor: none;"
+          data-recycling-slot="1"
+          style="position: absolute; box-sizing: border-box; overflow-anchor: none; top: 100px; left: 0px; width: 100%; height: 100px;"
         >
           Item 1
         </div>
@@ -150,7 +153,8 @@ exports[`VirtuosoMockContext > List > correctly renders items 1`] = `
           data-index="2"
           data-item-index="2"
           data-known-size="100"
-          style="overflow-anchor: none;"
+          data-recycling-slot="2"
+          style="position: absolute; box-sizing: border-box; overflow-anchor: none; top: 200px; left: 0px; width: 100%; height: 100px;"
         >
           Item 2
         </div>

@@ -30,6 +30,7 @@ export const scrollToIndexSystem = u.system(
   ([
     { gap, listRefresh, sizes, totalCount },
     {
+      contentInsets,
       fixedFooterHeight,
       fixedHeaderHeight,
       footerHeight,
@@ -71,13 +72,14 @@ export const scrollToIndexSystem = u.system(
       u.pipe(
         scrollToIndex,
         u.withLatestFrom(sizes, viewportHeight, totalCount, topListHeight, headerHeight, footerHeight, log),
-        u.withLatestFrom(gap, fixedHeaderHeight, fixedFooterHeight),
+        u.withLatestFrom(gap, fixedHeaderHeight, fixedFooterHeight, contentInsets),
         u.map(
           ([
             [location, sizes, viewportHeight, totalCount, topListHeight, headerHeight, footerHeight, log],
             gap,
             fixedHeaderHeight,
             fixedFooterHeight,
+            contentInsets,
           ]) => {
             const normalLocation = normalizeIndexLocation(location)
             const { align, behavior, offset } = normalLocation
@@ -85,11 +87,11 @@ export const scrollToIndexSystem = u.system(
 
             const index = originalIndexFromLocation(normalLocation, sizes, lastIndex)
 
-            let top = offsetOf(index, sizes.offsetTree, gap) + headerHeight
+            let top = offsetOf(index, sizes.offsetTree, gap) + headerHeight + contentInsets.start
             if (align === 'end') {
               top += fixedHeaderHeight + findMaxKeyValue(sizes.sizeTree, index)[1]! - viewportHeight + fixedFooterHeight
               if (index === lastIndex) {
-                top += footerHeight
+                top += footerHeight + contentInsets.end
               }
             } else if (align === 'center') {
               top += (fixedHeaderHeight + findMaxKeyValue(sizes.sizeTree, index)[1]! - viewportHeight + fixedFooterHeight) / 2

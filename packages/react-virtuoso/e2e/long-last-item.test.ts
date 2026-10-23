@@ -9,11 +9,13 @@ test.describe('list with a long last item', () => {
   })
 
   test('starts from the last item', async ({ page }) => {
-    const paddingTop: string = await page.evaluate(() => {
-      const listContainer = document.querySelector('[data-testid=virtuoso-item-list]')!
-      return (listContainer as HTMLElement).style.paddingTop
+    const position = await page.evaluate(() => {
+      const scroller = document.querySelector('[data-testid=virtuoso-scroller]')!
+      const last = document.querySelector('[data-item-index="9"]')!
+      return { scrollTop: scroller.scrollTop, gap: last.getBoundingClientRect().top - scroller.getBoundingClientRect().top }
     })
-    expect(paddingTop).toBe('7200px')
+    expect(position.scrollTop).toBe(7200)
+    expect(Math.abs(position.gap)).toBeLessThanOrEqual(1)
   })
 
   test('compensates on upwards scrolling correctly', async ({ page }) => {
