@@ -15,6 +15,7 @@ export interface ContentInsets {
 
 export interface RecyclingSnapshot {
   readonly contentInsets: ContentInsets
+  readonly drawDistance: number | undefined
   readonly window: PixelWindow | undefined
   readonly knownLayout: KnownLayout | undefined
   readonly focusedKey: React.Key | null
@@ -25,6 +26,7 @@ function copySnapshot(value: RecyclingSnapshot) {
   return {
     contentInsets: value.contentInsets,
     window: value.window,
+    drawDistance: value.drawDistance,
     knownLayout: value.knownLayout,
     focusedKey: value.focusedKey,
     revision: value.revision,
@@ -35,6 +37,7 @@ export function createRecyclingController() {
   let snapshot: RecyclingSnapshot = {
     contentInsets: { start: 0, end: 0 },
     window: undefined,
+    drawDistance: undefined,
     knownLayout: undefined,
     focusedKey: null,
     revision: 0,
@@ -51,6 +54,7 @@ export function createRecyclingController() {
     const next = pending
     pending = undefined
     if (
+      next.drawDistance === snapshot.drawDistance &&
       next.window === snapshot.window &&
       next.knownLayout === snapshot.knownLayout &&
       next.focusedKey === snapshot.focusedKey &&
@@ -61,6 +65,7 @@ export function createRecyclingController() {
     snapshot = {
       contentInsets: next.contentInsets,
       window: next.window,
+      drawDistance: next.drawDistance,
       knownLayout: next.knownLayout,
       focusedKey: next.focusedKey,
       revision: snapshot.revision + 1,
@@ -96,6 +101,15 @@ export function createRecyclingController() {
       const next = copySnapshot(value)
       next.contentInsets = { start, end }
       pending = next
+      flush()
+    },
+    setDrawDistance(input: number | undefined) {
+      const drawDistance = input !== undefined && Number.isFinite(input) ? Math.max(0, input) : undefined
+      const value = current()
+      if (value.drawDistance === drawDistance) {
+        return
+      }
+      pending = { ...value, drawDistance }
       flush()
     },
     setWindow(input: PixelWindow | undefined) {

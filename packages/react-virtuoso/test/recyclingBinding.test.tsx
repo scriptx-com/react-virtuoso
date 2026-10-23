@@ -23,24 +23,25 @@ it('publishes only the window on scroll and keeps multi-field updates transactio
   )
   type System = Parameters<typeof binding.apply>[0]
   const system: System = {
+    recyclingDrawDistance: u.statefulStream<number | undefined>(undefined),
     contentInsets: u.statefulStream({ start: 0, end: 0 }),
     propsReady: u.statefulStream(true),
     recycling: u.statefulStream<boolean | undefined>(true),
     getItemType: u.statefulStream<((item: any, index: number) => number | string | undefined) | undefined>(undefined),
     applyKnownLayout: u.stream(),
-    recyclingWindow: u.statefulStream<{ start: number; end: number } | undefined>(undefined),
+    recyclingWindowOverride: u.statefulStream<{ start: number; end: number } | undefined>(undefined),
     integrationFocusedKey: u.statefulStream<React.Key | null>(null),
     recyclingActive: u.statefulStream(true),
   }
   binding.apply(system)
   const unsubscribe = binding.subscribe(system)
   const events: string[] = []
-  for (const key of ['contentInsets', 'propsReady', 'recyclingWindow', 'integrationFocusedKey', 'recyclingActive'] as const) {
+  for (const key of ['contentInsets', 'propsReady', 'recyclingWindowOverride', 'integrationFocusedKey', 'recyclingActive'] as const) {
     u.subscribe(system[key] as u.Stream<unknown>, () => events.push(key))
   }
   events.length = 0
   act(() => controller.setWindow({ start: 100, end: 500 }))
-  expect(events).toEqual(['recyclingWindow'])
+  expect(events).toEqual(['recyclingWindowOverride'])
   expect(u.getValue(system.propsReady)).toBe(true)
   events.length = 0
   act(() => controller.setWindow({ start: 100, end: 500 }))
@@ -51,13 +52,13 @@ it('publishes only the window on scroll and keeps multi-field updates transactio
       controller.setFocusedItem('next')
     })
   )
-  expect(events).toEqual(['propsReady', 'recyclingWindow', 'integrationFocusedKey', 'propsReady'])
+  expect(events).toEqual(['propsReady', 'recyclingWindowOverride', 'integrationFocusedKey', 'propsReady'])
   expect(u.getValue(system.integrationFocusedKey)).toBe('next')
   events.length = 0
   u.publish(system.propsReady, false)
   events.length = 0
   act(() => controller.setWindow({ start: 300, end: 700 }))
-  expect(events).toEqual(['recyclingWindow'])
+  expect(events).toEqual(['recyclingWindowOverride'])
   expect(u.getValue(system.propsReady)).toBe(false)
   unsubscribe()
   events.length = 0

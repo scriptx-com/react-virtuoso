@@ -132,3 +132,35 @@ test('preserves a nested rail offset when a parked preceding row returns', async
   await go(page, 50, false, false)
   expect(await rail.evaluate((element) => element.scrollLeft)).toBe(180)
 })
+
+for (const [horizontal, rtl, minimal] of [
+  [false, false, false],
+  [true, false, false],
+  [true, true, false],
+  [true, false, true],
+] as const) {
+  for (const recycling of [false, true]) {
+    test(`fork window follows native scroll recycling=${recycling} horizontal=${horizontal} rtl=${rtl} minimal=${minimal}`, async ({
+      page,
+      baseURL,
+    }) => {
+      await page.goto(
+        `${baseURL}/?story=recycling--example&distance=200&recycling=${Number(recycling)}&horizontal=${Number(horizontal)}&rtl=${Number(rtl)}&minimal=${Number(minimal)}`
+      )
+      await page.waitForSelector('[data-storyloaded]')
+      await expect(page.locator('[data-cell="0"]')).toBeVisible()
+      const checkOffset = async (offset: number) => {
+        await go(page, offset, horizontal, rtl)
+        await expect(page.locator(`[data-cell="${Math.floor((offset - 50) / 100)}"]`)).toBeVisible()
+        await expect(page.locator(`[data-cell="${Math.floor((offset - 50) / 100) + 2}"]`)).toBeVisible()
+      }
+      await checkOffset(1050)
+      await checkOffset(2050)
+      await checkOffset(3050)
+      await checkOffset(2050)
+      await checkOffset(1050)
+      expect(await page.locator('[data-index]').count()).toBeLessThan(40)
+      expect(await page.locator('[data-recycling-slot]').count()).toBeLessThan(80)
+    })
+  }
+}

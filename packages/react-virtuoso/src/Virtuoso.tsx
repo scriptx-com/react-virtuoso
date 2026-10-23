@@ -11,6 +11,7 @@ import { systemToComponent } from './react-urx'
 import { coversKnownRange } from './recycling/layout'
 import { RecycledItems } from './recycling/RecycledItems'
 import { useRecyclingSystemBinding } from './recycling/systemBinding'
+import { bindRecyclingWindow } from './recycling/windowBinding'
 import * as u from './urx'
 import { VirtuosoMockContext } from './utils/context'
 import { correctItemSize } from './utils/correctItemSize'
@@ -73,7 +74,8 @@ const listComponentPropsSystem = /*#__PURE__*/ u.system(() => {
 
 const combinedSystem = /*#__PURE__*/ u.system(
   ([listSystem, propsSystem]) => {
-    return { ...listSystem, ...propsSystem }
+    const system = { ...listSystem, ...propsSystem }
+    return { ...system, ...bindRecyclingWindow(system) }
   },
   u.tup(listSystem, listComponentPropsSystem)
 )
@@ -160,6 +162,13 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
     fixedItemHeight,
     contentInsets,
   ] = useEmitterValues(itemListKeys)
+  const renderStarted = performance.now()
+  const reportRenderTime = usePublisher('recyclingRenderTime')
+  useIsomorphicLayoutEffect(() => {
+    if (recyclingActive && !showTopList) {
+      reportRenderTime(performance.now() - renderStarted)
+    }
+  })
   const setDomFocusedKey = usePublisher('domFocusedKey')
   const supportsRecycling =
     !showTopList &&

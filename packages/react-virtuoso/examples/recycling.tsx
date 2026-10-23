@@ -1,6 +1,6 @@
 import React from 'react'
 
-import { createRecyclingController, RecyclingIntegrationProvider, useRecyclingState, Virtuoso } from '../src'
+import { ExperimentalRailVirtuoso, createRecyclingController, RecyclingIntegrationProvider, useRecyclingState, Virtuoso } from '../src'
 
 const data = Array.from({ length: 1000 }, (_, id) => ({ id }))
 const metrics = { mounts: 0, updates: 0, unmounts: 0 }
@@ -50,6 +50,9 @@ export function Example() {
     Object.assign(window, { recyclingMetrics: metrics })
     Object.assign(metrics, { mounts: 0, updates: 0, unmounts: 0 })
     const value = createRecyclingController()
+    if (query.has('distance')) {
+      value.setDrawDistance(Number(query.get('distance')))
+    }
     if (query.get('insets') === '1') {
       value.setContentInsets({ start: 40, end: 60 })
     }
@@ -77,9 +80,10 @@ export function Example() {
     }),
     [horizontal]
   )
+  const List = query.get('minimal') === '1' ? ExperimentalRailVirtuoso : Virtuoso
   return (
     <RecyclingIntegrationProvider controller={controller}>
-      <Virtuoso
+      <List
         data={data}
         computeItemKey={key}
         {...(nested ? { getItemType: itemType } : {})}

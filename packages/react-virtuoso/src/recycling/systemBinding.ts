@@ -13,7 +13,8 @@ interface RecyclingSystem {
   recycling: u.StatefulStream<boolean | undefined>
   getItemType: u.StatefulStream<((item: any, index: number) => number | string | undefined) | undefined>
   applyKnownLayout: u.Stream<KnownLayout | undefined>
-  recyclingWindow: u.StatefulStream<PixelWindow | undefined>
+  recyclingWindowOverride: u.StatefulStream<PixelWindow | undefined>
+  recyclingDrawDistance: u.StatefulStream<number | undefined>
   integrationFocusedKey: u.StatefulStream<React.Key | null>
   recyclingActive: u.StatefulStream<boolean>
 }
@@ -50,7 +51,8 @@ export function useRecyclingSystemBinding() {
       }
       if (active) {
         publishChanged(system.contentInsets, snapshot?.contentInsets ?? EMPTY_INSETS)
-        publishChanged(system.recyclingWindow, snapshot?.window)
+        publishChanged(system.recyclingWindowOverride, snapshot?.window)
+        publishChanged(system.recyclingDrawDistance, snapshot?.drawDistance)
         publishChanged(system.integrationFocusedKey, snapshot?.focusedKey ?? null)
       }
       publishChanged(system.recyclingActive, active)
@@ -71,7 +73,8 @@ export function useRecyclingSystemBinding() {
             u.getValue(system.integrationFocusedKey) === snapshot.focusedKey &&
             u.getValue(system.recyclingActive) === active
           ) {
-            publishChanged(system.recyclingWindow, snapshot.window)
+            publishChanged(system.recyclingWindowOverride, snapshot.window)
+            publishChanged(system.recyclingDrawDistance, snapshot.drawDistance)
             return
           }
           const ready = u.getValue(system.propsReady)

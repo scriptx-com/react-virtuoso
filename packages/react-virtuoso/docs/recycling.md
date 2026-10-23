@@ -36,7 +36,7 @@ handling described above.
 ## Integration geometry
 
 `RecyclingIntegrationProvider` and `createRecyclingController()` let adapters
-supply pixel windows, exact layout ranges and the current logical focus key.
+supply draw distance, exact layout ranges and the current logical focus key.
 The ordinary standalone overscan APIs still work without a controller.
 Publish dependent changes in `controller.batch()`. Exact layout belongs to one
 dataset/layout revision; replace it together with dependent data. Estimates are
@@ -45,3 +45,15 @@ never exact geometry. Active unknown-size cells retain direct resize observation
 The controller is an adapter boundary, not additional application list props.
 Recycling reduces mounts; its effect on frame time must be measured with the
 application's real content and device.
+
+`controller.setDrawDistance(pixels)` enables the fork-owned adaptive window.
+Virtuoso uses its existing normalized scroll offset, viewport and total-size
+streams, plus render-to-commit duration, to project the window in the direction
+of travel. No adapter scroll listener or viewport observer is needed. Explicit
+zero is retained; `undefined` returns to ordinary overscan. Parked lists freeze
+their window and reset velocity when reactivated. Dataset and orientation changes
+also reset prediction. This applies to ordinary virtualization as well as recycling.
+
+`setWindow()` remains an explicit override for custom integrations. Clearing it
+resumes the configured draw-distance policy. Adapters should only translate their
+public options and publish geometry/focus ownership, not calculate scroll windows.
