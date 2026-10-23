@@ -53,3 +53,34 @@ describe('extend viewport by', () => {
     expect(spy).toHaveBeenCalledWith([150, 500])
   })
 })
+
+describe('recycling window scroll synchronization', () => {
+  it.each([
+    { from: 0, to: 10000 },
+    { from: 10000, to: 0 },
+  ])('does not fill the gap to a stale window on a jump from $from to $to', ({ from, to }) => {
+    const sys = system(([a, b]) => ({ ...a, ...b }), tup(sizeRangeSystem, domIOSystem))
+    const state = init(sys)
+    publish(state.viewportHeight, 400)
+    publish(state.listBoundary, [0, 0])
+    publish(state.scrollTop, from)
+    publish(state.recyclingWindow, { start: Math.max(0, from - 100), end: from + 500 })
+    publish(state.scrollTop, to)
+    expect(getValue(state.visibleRange)).toEqual([to, to + 400])
+    publish(state.recyclingWindow, { start: Math.max(0, to - 100), end: to + 500 })
+    expect(getValue(state.visibleRange)).toEqual([Math.max(0, to - 100), to + 500])
+  })
+
+  it('retains overlapping overscan and translates past header and padding', () => {
+    const sys = system(([a, b]) => ({ ...a, ...b }), tup(sizeRangeSystem, domIOSystem))
+    const state = init(sys)
+    publish(state.viewportHeight, 400)
+    publish(state.listBoundary, [0, 0])
+    publish(state.headerHeight, 30)
+    publish(state.contentInsets, { start: 20, end: 0 })
+    publish(state.scrollTop, 300)
+    publish(state.recyclingWindow, { start: 200, end: 800 })
+    publish(state.scrollTop, 400)
+    expect(getValue(state.visibleRange)).toEqual([150, 750])
+  })
+})

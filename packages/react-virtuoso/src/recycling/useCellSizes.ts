@@ -1,4 +1,5 @@
 import type { Key } from 'react'
+import { flushSync } from 'react-dom'
 
 import type { SizeFunction, SizeRange } from '../interfaces'
 
@@ -87,8 +88,16 @@ export function createCellSizeObserver({
       const element = entry.target as HTMLElement
       const binding = bindings.get(element)
       if (binding) {
-        queue(element, binding)
+        pending.set(element, binding)
       }
+    }
+    if (frame !== undefined) {
+      cancel(frame)
+      frame = undefined
+    }
+    // ResizeObserver runs before paint; delaying this batch exposes stale absolute offsets.
+    if (pending.size) {
+      flushSync(flush)
     }
   })
 

@@ -21,6 +21,16 @@ export interface RecyclingSnapshot {
   readonly revision: number
 }
 
+function copySnapshot(value: RecyclingSnapshot) {
+  return {
+    contentInsets: value.contentInsets,
+    window: value.window,
+    knownLayout: value.knownLayout,
+    focusedKey: value.focusedKey,
+    revision: value.revision,
+  }
+}
+
 export function createRecyclingController() {
   let snapshot: RecyclingSnapshot = {
     contentInsets: { start: 0, end: 0 },
@@ -48,7 +58,13 @@ export function createRecyclingController() {
     ) {
       return
     }
-    snapshot = { ...next, revision: snapshot.revision + 1 }
+    snapshot = {
+      contentInsets: next.contentInsets,
+      window: next.window,
+      knownLayout: next.knownLayout,
+      focusedKey: next.focusedKey,
+      revision: snapshot.revision + 1,
+    }
     for (const listener of [...listeners]) {
       listener()
     }
@@ -77,7 +93,9 @@ export function createRecyclingController() {
       if (value.contentInsets.start === start && value.contentInsets.end === end) {
         return
       }
-      pending = { ...value, contentInsets: { start, end } }
+      const next = copySnapshot(value)
+      next.contentInsets = { start, end }
+      pending = next
       flush()
     },
     setWindow(input: PixelWindow | undefined) {
@@ -89,7 +107,9 @@ export function createRecyclingController() {
       if (window?.start === value.window?.start && window?.end === value.window?.end) {
         return
       }
-      pending = { ...value, window: window ? { ...window } : undefined }
+      const next = copySnapshot(value)
+      next.window = window ? { start: window.start, end: window.end } : undefined
+      pending = next
       flush()
     },
     setKnownLayout(input: KnownLayout | undefined) {
@@ -108,7 +128,9 @@ export function createRecyclingController() {
       if (value.focusedKey === focusedKey) {
         return
       }
-      pending = { ...value, focusedKey }
+      const next = copySnapshot(value)
+      next.focusedKey = focusedKey
+      pending = next
       flush()
     },
   }

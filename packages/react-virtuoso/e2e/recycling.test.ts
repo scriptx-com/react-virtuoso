@@ -119,3 +119,16 @@ for (const recycling of [false, true]) {
     })
   }
 }
+
+test('preserves a nested rail offset when a parked preceding row returns', async ({ page, baseURL }) => {
+  await page.goto(`${baseURL}/?story=recycling--example&nested=1`)
+  await page.waitForSelector('[data-storyloaded]')
+  await go(page, 150, false, false)
+  const rail = page.locator('[data-nested-scroll="2"]')
+  await rail.evaluate((element) => {
+    element.scrollLeft = 180
+  })
+  expect(await rail.evaluate((element) => element.scrollLeft)).toBe(180)
+  await go(page, 50, false, false)
+  expect(await rail.evaluate((element) => element.scrollLeft)).toBe(180)
+})

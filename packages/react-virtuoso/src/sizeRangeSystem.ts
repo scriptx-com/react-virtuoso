@@ -70,6 +70,12 @@ export const sizeRangeSystem = u.system(
             const top = scrollTop - deviation
             if (recyclingWindow) {
               const origin = headerHeight + fixedHeaderHeight + deviation
+              // Scroll IO and the integration window update independently. A distant
+              // jump must not render the entire gap to the previous window while
+              // the controller catches up (notably RTL initial positioning).
+              if (recyclingWindow.end <= scrollTop || recyclingWindow.start >= scrollTop + viewportHeight) {
+                return [Math.max(0, scrollTop - origin), Math.max(0, scrollTop + viewportHeight - origin)] as NumberTuple
+              }
               return [
                 Math.max(0, Math.min(recyclingWindow.start, scrollTop) - origin),
                 Math.max(0, Math.max(recyclingWindow.end, scrollTop + viewportHeight) - origin),

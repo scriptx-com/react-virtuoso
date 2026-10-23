@@ -95,6 +95,8 @@ const Cell = React.memo(function RecycledCell({
     ...(horizontal
       ? { top: 0, height: '100%', display: 'inline-block', [rtl ? 'right' : 'left']: offset, ...(exact ? { width: size } : {}) }
       : { top: offset, left: 0, width: '100%', ...(exact ? { height: size } : {}) }),
+    // Virtuoso's bootstrap items share offset zero until their first measurement.
+    ...(!(size > 0) ? { opacity: 0, pointerEvents: 'none' as const } : {}),
     ...(!active ? { display: 'none' } : {}),
   }
   return (
@@ -291,10 +293,10 @@ export function RecycledItems(props: Props) {
         }
       : { height: totalSize + (props.contentInsets?.start ?? 0) + (props.contentInsets?.end ?? 0) }),
   }
-  // Physical hosts move in DOM order as needed; accessible reading order stays logical.
-  const ordered = [...pool.slots].sort(
-    (a, b) => Number(b.active) - Number(a.active) || (records.get(a.slotId)?.index ?? 0) - (records.get(b.slotId)?.index ?? 0)
-  )
+  // Keep parked hosts at their logical position too. Moving them to the end makes React
+  // relocate still-visible siblings when they return, resetting nested DOM scroll offsets.
+  // Hidden hosts do not affect accessible reading order.
+  const ordered = [...pool.slots].sort((a, b) => (records.get(a.slotId)?.index ?? 0) - (records.get(b.slotId)?.index ?? 0))
   return (
     <ListComponent
       {...(typeof ListComponent === 'string' ? {} : { context })}

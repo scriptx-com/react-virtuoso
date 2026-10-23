@@ -6,6 +6,7 @@ import useScrollTop from './hooks/useScrollTop'
 import useSize from './hooks/useSize'
 import useWindowViewportRectRef from './hooks/useWindowViewportRect'
 import { listSystem } from './listSystem'
+import { minimalRailSystem } from './minimalRailSystem'
 import { systemToComponent } from './react-urx'
 import { coversKnownRange } from './recycling/layout'
 import { RecycledItems } from './recycling/RecycledItems'
@@ -699,7 +700,35 @@ export const {
     },
   },
   ListRoot,
-  useRecyclingSystemBinding
+  useRecyclingSystemBinding,
+  useExperimentalRailSpec
+)
+
+const ExperimentalRailContext = React.createContext(false)
+function useExperimentalRailSpec() {
+  return React.useContext(ExperimentalRailContext) ? minimalRailSystem(combinedSystem) : combinedSystem
+}
+
+/** Experimental horizontal-only engine; optional scrolling features are unsupported. */
+export const ExperimentalRailVirtuoso = React.forwardRef<VirtuosoHandle, VirtuosoProps<any, any>>(
+  function ExperimentalRailVirtuoso(props, ref) {
+    if (
+      props.horizontalDirection !== true ||
+      Boolean(props.alignToBottom) ||
+      Boolean(props.followOutput) ||
+      Boolean(props.scrollIntoViewOnChange) ||
+      Boolean(props.scrollSeekConfiguration) ||
+      Boolean(props.useWindowScroll) ||
+      Boolean(props.customScrollParent)
+    ) {
+      throw new Error('ExperimentalRailVirtuoso requires an ordinary horizontal rail')
+    }
+    return (
+      <ExperimentalRailContext.Provider value={true}>
+        <Virtuoso {...props} ref={ref} />
+      </ExperimentalRailContext.Provider>
+    )
+  }
 )
 
 const Scroller = /*#__PURE__*/ buildScroller({ useEmitter, useEmitterValue, usePublisher }, true)

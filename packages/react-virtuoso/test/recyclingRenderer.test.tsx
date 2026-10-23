@@ -120,6 +120,26 @@ it('parks incompatible idle cells without measurement attributes or active lifec
   }
 })
 
+it.each([false, true])('does not relocate retained hosts when a parked predecessor returns (horizontal=%s)', (horizontal) => {
+  const itemContent = (index: number) => <div>{index}</div>
+  const getItemType = (_item: unknown, index: number) => index
+  const tree = (start: number) => (
+    <RecycledItems {...base} horizontal={horizontal} items={range(start)} itemContent={itemContent} getItemType={getItemType} />
+  )
+  const view = render(tree(0))
+  const retained = view.container.querySelector('[data-item-index="2"]')!
+  view.rerender(tree(1))
+  const list = retained.parentElement!
+  const insert = vi.spyOn(list, 'insertBefore')
+  const append = vi.spyOn(list, 'appendChild')
+  view.rerender(tree(0))
+  expect(view.container.querySelector('[data-item-index="2"]')).toBe(retained)
+  expect(insert.mock.calls.some(([node]) => node === retained)).toBe(false)
+  expect(append.mock.calls.some(([node]) => node === retained)).toBe(false)
+  insert.mockRestore()
+  append.mockRestore()
+})
+
 it('retains one focused exception without filling all intervening indexes', () => {
   const itemContent = (index: number) => <button>{index}</button>
   const view = render(<RecycledItems {...base} items={range(0)} itemContent={itemContent} />)
@@ -354,4 +374,32 @@ it.each([false, true])('keeps state and callbacks with the logical item A-B-A (h
   expect(mounts).toHaveBeenCalledTimes(1)
   act(() => button.click())
   expect(pressed.mock.calls).toEqual([[0], [1], [0]])
+})
+
+it.each([false, true])('hides zero-size bootstrap cells until positioned without remounting (horizontal=%s)', (horizontal) => {
+  const mounts = vi.fn()
+  function Content({ index }: { index: number }) {
+    React.useEffect(() => {
+      mounts()
+    }, [])
+    return <span>{index}</span>
+  }
+  const itemContent = (index: number) => <Content index={index} />
+  const initial = range(0).map((item) => ({ ...item, offset: 0, size: 0 }))
+  const view = render(<RecycledItems {...base} knownLayout={undefined} horizontal={horizontal} items={initial} itemContent={itemContent} />)
+  const hosts = [...view.container.querySelectorAll<HTMLElement>('[data-recycling-slot]')]
+  expect(hosts).toHaveLength(3)
+  for (const host of hosts) {
+    expect(host.style.opacity).toBe('0')
+    expect(host.style.pointerEvents).toBe('none')
+    expect(host.style.display).not.toBe('none')
+  }
+  view.rerender(<RecycledItems {...base} knownLayout={undefined} horizontal={horizontal} items={range(0)} itemContent={itemContent} />)
+  expect([...view.container.querySelectorAll('[data-recycling-slot]')]).toEqual(hosts)
+  expect(mounts).toHaveBeenCalledTimes(3)
+  hosts.forEach((host, index) => {
+    expect(host.style.opacity).toBe('')
+    expect(host.style.pointerEvents).toBe('')
+    expect(host.style[horizontal ? 'left' : 'top']).toBe(`${index * 100}px`)
+  })
 })

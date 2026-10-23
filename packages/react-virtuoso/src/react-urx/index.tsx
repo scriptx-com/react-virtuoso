@@ -195,7 +195,8 @@ export function systemToComponent<SS extends AnySystemSpec, M extends SystemProp
   Root?: R,
   useIntegration: () =>
     | { apply: (system: SR<SS>, props?: Record<string, unknown>) => void; subscribe: (system: SR<SS>) => () => void }
-    | undefined = () => undefined
+    | undefined = () => undefined,
+  useSystemSpec: () => SS = () => systemSpec
 ) {
   type ContextValue = ReturnType<SS['constructor']>
   const requiredPropNames = Object.keys(map.required || {})
@@ -261,9 +262,10 @@ export function systemToComponent<SS extends AnySystemSpec, M extends SystemProp
   const Component = React.forwardRef<CompMethods, CompProps>(function SystemComponent(propsWithChildren, ref) {
     const { children, ...props } = propsWithChildren as any
     const integration = useIntegration()
+    const selectedSpec = useSystemSpec()
 
     const [system] = React.useState(() => {
-      return u.tap(u.init(systemSpec), (system) => {
+      return u.tap(u.init(selectedSpec), (system) => {
         applyPropsToSystem(system, props, true, integration)
       })
     })

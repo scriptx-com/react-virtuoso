@@ -18,6 +18,12 @@ interface RecyclingSystem {
   recyclingActive: u.StatefulStream<boolean>
 }
 
+function publishChanged<T>(stream: u.StatefulStream<T>, value: T) {
+  if (u.getValue(stream) !== value) {
+    u.publish(stream, value)
+  }
+}
+
 const EMPTY_INSETS = { start: 0, end: 0 }
 const appliedLayouts = new WeakMap<RecyclingSystem, KnownLayout | undefined>()
 
@@ -43,11 +49,11 @@ export function useRecyclingSystemBinding() {
         u.publish(system.applyKnownLayout, layout)
       }
       if (active) {
-        u.publish(system.contentInsets, snapshot?.contentInsets ?? EMPTY_INSETS)
-        u.publish(system.recyclingWindow, snapshot?.window)
-        u.publish(system.integrationFocusedKey, snapshot?.focusedKey ?? null)
+        publishChanged(system.contentInsets, snapshot?.contentInsets ?? EMPTY_INSETS)
+        publishChanged(system.recyclingWindow, snapshot?.window)
+        publishChanged(system.integrationFocusedKey, snapshot?.focusedKey ?? null)
       }
-      u.publish(system.recyclingActive, active)
+      publishChanged(system.recyclingActive, active)
     }
     return {
       apply,
@@ -56,6 +62,18 @@ export function useRecyclingSystemBinding() {
           return u.noop
         }
         return controller.subscribe(() => {
+          const snapshot = controller.getSnapshot()
+          // A window-only update is a single stream publication, so it does not
+          // need the props transaction used for coordinated layout/focus changes.
+          if (
+            appliedLayouts.get(system) === snapshot.knownLayout &&
+            u.getValue(system.contentInsets) === snapshot.contentInsets &&
+            u.getValue(system.integrationFocusedKey) === snapshot.focusedKey &&
+            u.getValue(system.recyclingActive) === active
+          ) {
+            publishChanged(system.recyclingWindow, snapshot.window)
+            return
+          }
           const ready = u.getValue(system.propsReady)
           u.publish(system.propsReady, false)
           apply(system)

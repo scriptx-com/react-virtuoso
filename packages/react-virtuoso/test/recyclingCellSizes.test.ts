@@ -77,8 +77,9 @@ describe('shared active cell measurement', () => {
     expect(h.callback).not.toHaveBeenCalled()
     target.element.textContent = '180'
     h.resize(target.element)
-    h.flush()
     expect(h.callback).toHaveBeenLastCalledWith([{ startIndex: 3, endIndex: 3, size: 180 }])
+    h.flush()
+    expect(h.callback).toHaveBeenCalledTimes(1)
     h.resize(target.element)
     h.flush()
     expect(h.callback).toHaveBeenCalledTimes(1)
