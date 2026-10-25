@@ -5,7 +5,7 @@ Set `recycling={false}` to retain logical React keys and ordinary unmounting.
 Optional `getItemType(item, index)` separates incompatible cell implementations.
 Use stable `computeItemKey` values when data can move or be replaced.
 
-Grouped/top-item, inverse, bottom-aligned, follow-output, scroll-seek, window and
+For `Virtuoso` lists, grouped/top-item, inverse, bottom-aligned, follow-output, scroll-seek, window and
 custom-scroll-parent modes retain ordinary virtualization. Explicitly requesting
 recycling in these modes produces one development warning. Unknown initial
 geometry and SSR use natural flow until the first offsets are available.
@@ -72,3 +72,19 @@ incomplete. Virtuoso owns the readiness boundary on vertical item hosts in both
 ordinary and recycled rendering, without adding DOM wrappers. Registrations
 propagate through nested rows; the last release requests a fresh measurement.
 This signals geometry readiness, not arbitrary network loading.
+
+## Grids
+
+`VirtuosoGrid` also recycles compatible cells by default once its item dimensions
+are known, with the same `recycling`, `getItemType` and lifecycle hooks. The fork
+owns the pool; adapters only forward identity, compatibility and focus ownership.
+Visible cells stay in normal CSS flex/grid flow, preserving responsive columns,
+gaps and RTL. Idle reserves are hidden and excluded from measurement. A focused
+cell outside the render window is retained outside flow until focus moves.
+
+Grid geometry retains VirtuosoGrid's existing equal-size item contract; this does
+not add masonry or variable-span layouts. Custom Item/List components must forward
+attributes, handlers, refs and styles. Initial probing and scroll-seek placeholders
+use ordinary rendering. Grid window size still uses its existing `overscan` and
+`increaseViewportBy` props; controller adaptive list windows and exact layout ranges
+do not apply to grids. The integration controller supplies focus ownership only.

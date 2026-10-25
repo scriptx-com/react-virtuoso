@@ -89,6 +89,11 @@ export interface VirtuosoGridHandle {
  * @group VirtuosoGrid
  */
 export interface VirtuosoGridProps<Data, Context = unknown> extends GridRootProps {
+  /** Reuse compatible cells. Enabled by default after initial geometry is measured. */
+  recycling?: boolean
+  /** Separate incompatible item implementations into independent recycling pools. */
+  getItemType?: (item: Data, index: number) => string | number | undefined
+
   /**
    * Called with true / false when the list has reached the bottom / gets scrolled up.
    * Can be used to load newer items, like `tail -f`.
