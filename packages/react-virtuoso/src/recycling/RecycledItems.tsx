@@ -4,6 +4,7 @@ import useIsomorphicLayoutEffect from '../hooks/useIsomorphicLayoutEffect'
 import { offsetOf } from '../sizeSystem'
 import { allocateSlots, emptyPool } from './allocator'
 import { knownSizeAt } from './layout'
+import { MeasurementBoundaryContext, useMeasurementBoundary } from './measurementBoundary'
 import { RecyclingContext, useRecyclingActivity } from './RecyclingContext'
 import { createCellSizeObserver } from './useCellSizes'
 
@@ -83,7 +84,15 @@ const Cell = React.memo(function RecycledCell({
     () => ({ index, logicalKey: slot.key, slotId: slot.slotId, generation: slot.generation, active, scope }),
     [slot.key, slot.slotId, slot.generation, active, scope, index]
   )
-  const ref = React.useCallback((element: HTMLElement | null) => register(slot.slotId, element), [register, slot.slotId])
+  const host = React.useRef<HTMLElement | null>(null)
+  const boundary = useMeasurementBoundary(host, !horizontal && active)
+  const ref = React.useCallback(
+    (element: HTMLElement | null) => {
+      host.current = element
+      register(slot.slotId, element)
+    },
+    [register, slot.slotId]
+  )
   const content = React.useMemo(
     () => itemContent(index + firstItemIndex, data, context),
     [itemContent, index, firstItemIndex, data, context]
@@ -101,20 +110,22 @@ const Cell = React.memo(function RecycledCell({
   }
   return (
     <RecyclingContext.Provider value={assignment}>
-      {React.createElement(
-        ItemComponent,
-        {
-          ...(typeof ItemComponent === 'string' ? {} : { context, item: data }),
-          ref,
-          style,
-          'data-recycling-slot': slot.slotId,
-          'data-index': active ? index : undefined,
-          'data-item-index': active ? index + firstItemIndex : undefined,
-          'data-known-size': active ? size : undefined,
-          'aria-hidden': active ? undefined : true,
-        },
-        content
-      )}
+      <MeasurementBoundaryContext.Provider value={boundary}>
+        {React.createElement(
+          ItemComponent,
+          {
+            ...(typeof ItemComponent === 'string' ? {} : { context, item: data }),
+            ref,
+            style,
+            'data-recycling-slot': slot.slotId,
+            'data-index': active ? index : undefined,
+            'data-item-index': active ? index + firstItemIndex : undefined,
+            'data-known-size': active ? size : undefined,
+            'aria-hidden': active ? undefined : true,
+          },
+          content
+        )}
+      </MeasurementBoundaryContext.Provider>
     </RecyclingContext.Provider>
   )
 })

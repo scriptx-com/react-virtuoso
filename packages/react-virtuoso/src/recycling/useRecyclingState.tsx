@@ -1,6 +1,5 @@
 import React from 'react'
 
-import useIsomorphicLayoutEffect from '../hooks/useIsomorphicLayoutEffect'
 import { useRecyclingContext } from './RecyclingContext'
 
 import type { RecyclingAssignment } from './RecyclingContext'
@@ -19,7 +18,7 @@ export function useRecyclingState<T>(
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
   const assignment = useRecyclingContext()
   const active = assignment?.active ?? true
-  const fresh = () => ({ assignment, dependencies: [...resetDependencies], identity: {}, value: initializer() })
+  const fresh = () => ({ assignment, active, dependencies: [...resetDependencies], identity: {}, value: initializer() })
   const [stored, setStored] = React.useState(fresh)
   let current = stored
   if (
@@ -30,22 +29,18 @@ export function useRecyclingState<T>(
     current = fresh()
     // React discards this render-phase update if the candidate render is abandoned.
     setStored(current)
+  } else if (stored.active !== active) {
+    current = { ...stored, active }
+    setStored(current)
   }
   const identity = current.identity
-  const committed = React.useRef<{ identity: object; active: boolean } | null>(null)
-  useIsomorphicLayoutEffect(() => {
-    committed.current = { identity, active }
-    return () => {
-      committed.current = null
-    }
-  }, [identity, active])
   const update = React.useCallback<React.Dispatch<React.SetStateAction<T>>>(
     (value) => {
-      if (committed.current?.identity !== identity || !committed.current.active) {
-        return
-      }
       setStored((previous) => {
-        if (previous.identity !== identity) {
+        // Validate against React's state queue, not a layout-effect ref: child
+        // layout effects and callback refs can initialize this state before our
+        // own layout effects run. Abandoned renders cannot publish an identity.
+        if (previous.identity !== identity || !previous.active) {
           return previous
         }
         const next = typeof value === 'function' ? (value as (previous: T) => T)(previous.value) : value

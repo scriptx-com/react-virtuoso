@@ -9,6 +9,7 @@ import { listSystem } from './listSystem'
 import { minimalRailSystem } from './minimalRailSystem'
 import { systemToComponent } from './react-urx'
 import { coversKnownRange } from './recycling/layout'
+import { MeasurementItem } from './recycling/measurementBoundary'
 import { RecycledItems } from './recycling/RecycledItems'
 import { useRecyclingSystemBinding } from './recycling/systemBinding'
 import { bindRecyclingWindow } from './recycling/windowBinding'
@@ -345,8 +346,10 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
         }
 
         return React.createElement(
-          ItemComponent as React.ElementType,
+          MeasurementItem,
           Object.assign(typeof ItemComponent === 'string' ? {} : { context }, itemPropIfNotDomElement(ItemComponent, item.data), {
+            component: ItemComponent,
+            enabled: !horizontalDirection && recyclingActive,
             'data-index': index,
             'data-item-group-index': item.groupIndex,
             'data-item-index': item.index,

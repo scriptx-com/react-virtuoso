@@ -57,3 +57,18 @@ also reset prediction. This applies to ordinary virtualization as well as recycl
 `setWindow()` remains an explicit override for custom integrations. Clearing it
 resumes the configured draw-distance policy. Adapters should only translate their
 public options and publish geometry/focus ownership, not calculate scroll windows.
+
+`useRecyclingController()` owns adapter controller transactions when the dataset,
+axis, exact layout or content insets change. It carries the committed focus key
+forward; draw-distance-only updates keep the controller stable. Adapters choose
+their default pixel distance before calling it.
+
+`useRecyclingLifetime(logicalKey?)` provides committed callback ownership for
+consumer effects and event handlers. `isCurrent()` rejects retired or parked
+owners. `RecyclingContext` is available for custom integration scopes.
+
+Nested evaluators call `usePendingMeasurement(pending)` while their geometry is
+incomplete. Virtuoso owns the readiness boundary on vertical item hosts in both
+ordinary and recycled rendering, without adding DOM wrappers. Registrations
+propagate through nested rows; the last release requests a fresh measurement.
+This signals geometry readiness, not arbitrary network loading.
