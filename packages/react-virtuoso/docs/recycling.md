@@ -75,8 +75,8 @@ This signals geometry readiness, not arbitrary network loading.
 
 ## Grids
 
-`VirtuosoGrid` also recycles compatible cells by default once its item dimensions
-are known, with the same `recycling`, `getItemType` and lifecycle hooks. The fork
+`VirtuosoGrid` also recycles compatible cells by default, including the initial measurement
+pass, with the same `recycling`, `getItemType` and lifecycle hooks. The fork
 owns the pool; adapters only forward identity, compatibility and focus ownership.
 Visible cells stay in normal CSS flex/grid flow, preserving responsive columns,
 gaps and RTL. Idle reserves are hidden and excluded from measurement. A focused
@@ -84,7 +84,7 @@ cell outside the render window is retained outside flow until focus moves.
 
 Grid geometry retains VirtuosoGrid's existing equal-size item contract; this does
 not add masonry or variable-span layouts. Custom Item/List components must forward
-attributes, handlers, refs and styles. Initial probing and scroll-seek placeholders
-use ordinary rendering. Grid window size still uses its existing `overscan` and
+attributes, handlers, refs and styles. Initial probing uses the same recycled cells in natural flow, avoiding a second
+mount when dimensions arrive. Scroll-seek placeholders use ordinary rendering. Grid window size still uses its existing `overscan` and
 `increaseViewportBy` props; controller adaptive list windows and exact layout ranges
 do not apply to grids. The integration controller supplies focus ownership only.

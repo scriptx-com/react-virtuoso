@@ -155,3 +155,18 @@ it('does not consume a nested recycled list focus as its own grid index', () => 
   )
   expect(() => fireEvent.focus(view.container.querySelector('button')!)).not.toThrow()
 })
+
+it('keeps bootstrap cells mounted when their first measurement arrives', () => {
+  mounts.mockClear()
+  const grid = (size: number) => (
+    <VirtuosoGridMockContext.Provider value={{ itemHeight: size, itemWidth: size, viewportHeight: 200, viewportWidth: 300 }}>
+      <VirtuosoGrid data={data} initialItemCount={6} itemContent={content} computeItemKey={key} />
+    </VirtuosoGridMockContext.Provider>
+  )
+  const view = render(grid(0))
+  const first = view.container.querySelector('[data-index="0"]')
+  expect(mounts).toHaveBeenCalledTimes(6)
+  view.rerender(grid(100))
+  expect(view.container.querySelector('[data-index="0"]')).toBe(first)
+  expect(mounts).toHaveBeenCalledTimes(6)
+})

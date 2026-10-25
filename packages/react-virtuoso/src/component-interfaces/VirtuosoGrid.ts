@@ -89,7 +89,7 @@ export interface VirtuosoGridHandle {
  * @group VirtuosoGrid
  */
 export interface VirtuosoGridProps<Data, Context = unknown> extends GridRootProps {
-  /** Reuse compatible cells. Enabled by default after initial geometry is measured. */
+  /** Reuse compatible cells. Enabled by default, including the initial measurement pass. */
   recycling?: boolean
   /** Separate incompatible item implementations into independent recycling pools. */
   getItemType?: (item: Data, index: number) => string | number | undefined

@@ -87,7 +87,7 @@ const GridItems: React.FC = /*#__PURE__*/ React.memo(function GridItems() {
   const integrationFocusedKey = useEmitterValue('integrationFocusedKey')
   const [placement, setPlacement] = React.useState({ left: 0, top: 0, reverse: false })
   const [domFocusedKey, setDomFocusedKey] = React.useState<React.Key | null>(null)
-  const recycle = recycling !== false && gridState.itemWidth > 0 && gridState.itemHeight > 0
+  const recycle = recycling !== false
 
   const listClassName = useEmitterValue('listClassName')
   const itemClassName = useEmitterValue('itemClassName')
@@ -186,7 +186,7 @@ const GridItems: React.FC = /*#__PURE__*/ React.memo(function GridItems() {
           state={gridState}
           data={data}
           totalCount={totalCount}
-          columns={itemsPerRow(viewport.width, gridState.itemWidth, gap.column)}
+          columns={gridState.itemWidth > 0 ? itemsPerRow(viewport.width, gridState.itemWidth, gap.column) : 1}
           rowGap={gap.row}
           columnGap={gap.column}
           focusedKey={integrationFocusedKey ?? domFocusedKey}
