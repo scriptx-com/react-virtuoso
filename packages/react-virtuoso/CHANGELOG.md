@@ -1,5 +1,9 @@
 # react-virtuoso
 
+## 4.18.7-6
+
+- Add compatible-cell recycling for lists and grids, with adaptive windows, focus retention, and nested measurement readiness. [scriptx-com/react-virtuoso#1](https://github.com/scriptx-com/react-virtuoso/pull/1)
+
 ## 4.18.7
 
 ### Patch Changes
