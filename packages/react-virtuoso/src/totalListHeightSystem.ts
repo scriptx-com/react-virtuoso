@@ -3,13 +3,22 @@ import { listStateSystem } from './listStateSystem'
 import * as u from './urx'
 
 export const totalListHeightSystem = u.system(
-  ([{ fixedFooterHeight, fixedHeaderHeight, footerHeight, headerHeight }, { listState }]) => {
+  ([{ contentInsets, fixedFooterHeight, fixedHeaderHeight, footerHeight, headerHeight }, { listState }]) => {
     const totalListHeightChanged = u.stream<number>()
     const totalListHeight = u.statefulStreamFromEmitter(
       u.pipe(
-        u.combineLatest(footerHeight, fixedFooterHeight, headerHeight, fixedHeaderHeight, listState),
-        u.map(([footerHeight, fixedFooterHeight, headerHeight, fixedHeaderHeight, listState]) => {
-          return footerHeight + fixedFooterHeight + headerHeight + fixedHeaderHeight + listState.offsetBottom + listState.bottom
+        u.combineLatest(footerHeight, fixedFooterHeight, headerHeight, fixedHeaderHeight, listState, contentInsets),
+        u.map(([footerHeight, fixedFooterHeight, headerHeight, fixedHeaderHeight, listState, contentInsets]) => {
+          return (
+            contentInsets.start +
+            contentInsets.end +
+            footerHeight +
+            fixedFooterHeight +
+            headerHeight +
+            fixedHeaderHeight +
+            listState.offsetBottom +
+            listState.bottom
+          )
         })
       ),
       0

@@ -1,5 +1,7 @@
 import React from 'react'
 
+import { useRecyclingActivity } from '../recycling/RecyclingContext'
+
 export type CallbackRefParam = HTMLElement | null
 
 export default function useSize(callback: (e: HTMLElement) => void, enabled: boolean, skipAnimationFrame: boolean) {
@@ -7,38 +9,43 @@ export default function useSize(callback: (e: HTMLElement) => void, enabled: boo
 }
 
 export function useSizeWithElRef(callback: (e: HTMLElement) => void, enabled: boolean, skipAnimationFrame: boolean) {
+  const active = useRecyclingActivity()
   const ref = React.useRef<CallbackRefParam>(null)
-
-  let callbackRef = (_el: CallbackRefParam) => {
-    void 0
-  }
+  const owner = React.useRef<ResizeObserver | null>(null)
 
   const observer = React.useMemo(() => {
     if (typeof ResizeObserver !== 'undefined') {
-      return new ResizeObserver((entries: ResizeObserverEntry[]) => {
+      const instance = new ResizeObserver((entries: ResizeObserverEntry[]) => {
         const code = () => {
           const element = entries[0]!.target as HTMLElement
-          if (element.offsetParent !== null) {
+          if (owner.current === instance && ref.current === element && element.offsetParent !== null) {
             callback(element)
           }
         }
         skipAnimationFrame ? code() : requestAnimationFrame(code)
       })
+      return instance
     }
     return null
   }, [callback, skipAnimationFrame])
 
-  callbackRef = (elRef: CallbackRefParam) => {
-    if (elRef && enabled) {
-      observer?.observe(elRef)
-      ref.current = elRef
-    } else {
+  const callbackRef = React.useCallback(
+    (el: CallbackRefParam) => {
+      const next = el && enabled && active ? el : null
+      if (ref.current === next) {
+        return
+      }
       if (ref.current) {
         observer?.unobserve(ref.current)
       }
-      ref.current = null
-    }
-  }
+      ref.current = next
+      owner.current = next ? observer : null
+      if (next) {
+        observer?.observe(next)
+      }
+    },
+    [observer, enabled, active]
+  )
 
   return { callbackRef, ref }
 }

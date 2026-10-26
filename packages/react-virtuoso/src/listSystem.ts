@@ -13,7 +13,7 @@ import { scrollIntoViewSystem } from './scrollIntoViewSystem'
 import { scrollSeekSystem } from './scrollSeekSystem'
 import { scrollToIndexSystem } from './scrollToIndexSystem'
 import { sizeRangeSystem } from './sizeRangeSystem'
-import { sizeSystem } from './sizeSystem'
+import { offsetOf, rangesWithinOffsets, sizeSystem } from './sizeSystem'
 import { stateLoadSystem } from './stateLoadSystem'
 import { topItemCountSystem } from './topItemCountSystem'
 import { totalListHeightSystem } from './totalListHeightSystem'
@@ -68,6 +68,10 @@ export const listSystem = u.system(
   ([
     {
       data,
+      applyKnownLayout,
+      knownLayout,
+      beforeKnownLayoutChange,
+      afterKnownLayoutChange,
       defaultItemSize,
       firstItemIndex,
       fixedItemSize,
@@ -103,8 +107,70 @@ export const listSystem = u.system(
       domIO.viewportHeight
     )
 
+    // Preserve the visible item's pixel anchor when a layout revision replaces sizes.
+    // Use Virtuoso's existing scroll correction channel in either direction.
+    let geometryAnchor: { index: number; within: number; scrollTop: number } | undefined
+    u.subscribe(beforeKnownLayoutChange, () => {
+      if (geometryAnchor) {
+        return
+      }
+      const scrollTop = u.getValue(domIO.statefulScrollTop)
+      const tree = u.getValue(sizes).offsetTree
+      const position =
+        scrollTop - u.getValue(domIO.headerHeight) - u.getValue(domIO.fixedHeaderHeight) - u.getValue(domIO.contentInsets).start
+      if (position <= 0 || !tree.length || !u.getValue(scrolledToInitialItem)) {
+        return
+      }
+      const point = rangesWithinOffsets(tree, position, position)[0]?.value
+      if (!point) {
+        return
+      }
+      const itemGap = u.getValue(gap)
+      const index = Math.min(
+        u.getValue(statefulTotalCount) - 1,
+        point.index + Math.floor((position - point.offset) / (point.size + itemGap))
+      )
+      if (index < 0) {
+        return
+      }
+      geometryAnchor = { index, within: position - offsetOf(index, tree, itemGap), scrollTop }
+    })
+    const restoreGeometryAnchor = () => {
+      if (!u.getValue(featureGroup1.propsReady)) {
+        return
+      }
+      const anchor = geometryAnchor
+      geometryAnchor = undefined
+      const tree = u.getValue(sizes).offsetTree
+      if (!anchor || !tree.length || !u.getValue(statefulTotalCount)) {
+        return
+      }
+      const index = Math.min(anchor.index, u.getValue(statefulTotalCount) - 1)
+      const itemGap = u.getValue(gap)
+      const offset = offsetOf(index, tree, itemGap)
+      const size = offsetOf(index + 1, tree, itemGap) - offset - itemGap
+      const target =
+        offset +
+        Math.min(anchor.within, Math.max(0, size - 1)) +
+        u.getValue(domIO.headerHeight) +
+        u.getValue(domIO.fixedHeaderHeight) +
+        u.getValue(domIO.contentInsets).start
+      const delta = target - anchor.scrollTop
+      if (delta !== 0) {
+        u.publish(domIO.scrollBy, { top: delta, behavior: 'auto' })
+      }
+    }
+    u.subscribe(afterKnownLayoutChange, restoreGeometryAnchor)
+    u.subscribe(featureGroup1.propsReady, (ready) => {
+      if (ready) {
+        restoreGeometryAnchor()
+      }
+    })
+
     return {
       data,
+      applyKnownLayout,
+      knownLayout,
       defaultItemHeight: defaultItemSize,
       firstItemIndex,
       fixedItemHeight: fixedItemSize,

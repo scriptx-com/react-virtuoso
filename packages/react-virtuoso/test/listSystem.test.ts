@@ -91,8 +91,17 @@ describe('list engine', () => {
     it('starts from a specified location', () => {
       const INITIAL_INDEX = 300
       const SIZE = 30
-      const { initialTopMostItemIndex, listState, propsReady, scrollTo, scrollTop, sizeRanges, totalCount, viewportHeight } =
-        init(listSystem)
+      const {
+        initialItemFinalLocationReached,
+        initialTopMostItemIndex,
+        listState,
+        propsReady,
+        scrollTo,
+        scrollTop,
+        sizeRanges,
+        totalCount,
+        viewportHeight,
+      } = init(listSystem)
 
       publish(initialTopMostItemIndex, INITIAL_INDEX)
       publish(scrollTop, 0)
@@ -108,7 +117,7 @@ describe('list engine', () => {
 
       publish(sizeRanges, [{ endIndex: INITIAL_INDEX, size: SIZE, startIndex: INITIAL_INDEX }])
 
-      expect(getValue(listState).items).toHaveLength(0)
+      expect(getValue(listState).items.map((item) => item.index)).toEqual([INITIAL_INDEX])
 
       return new Promise((resolve) => {
         setTimeout(() => {
@@ -119,6 +128,8 @@ describe('list engine', () => {
 
           // the UI responds by publishing back through the scrollTop stream
           publish(scrollTop, INITIAL_INDEX * SIZE)
+          // The scroller acknowledges that the initial target has been reached.
+          publish(initialItemFinalLocationReached, true)
           expect(getValue(listState).items).toHaveLength(7)
           resolve(true)
         }, 100)
@@ -128,8 +139,17 @@ describe('list engine', () => {
     it('starts from a specified location with fixed item size', () => {
       const INITIAL_INDEX = 300
       const SIZE = 30
-      const { fixedItemHeight, initialTopMostItemIndex, listState, propsReady, scrollTo, scrollTop, totalCount, viewportHeight } =
-        init(listSystem)
+      const {
+        fixedItemHeight,
+        initialItemFinalLocationReached,
+        initialTopMostItemIndex,
+        listState,
+        propsReady,
+        scrollTo,
+        scrollTop,
+        totalCount,
+        viewportHeight,
+      } = init(listSystem)
 
       publish(initialTopMostItemIndex, INITIAL_INDEX)
       publish(scrollTop, 0)
@@ -138,13 +158,13 @@ describe('list engine', () => {
       publish(propsReady, true)
       publish(fixedItemHeight, SIZE)
       expect(getValue(listState)).toMatchObject({
-        items: [],
+        items: [{ index: INITIAL_INDEX }],
       })
 
       const sub = vi.fn()
       subscribe(scrollTo, sub)
 
-      expect(getValue(listState).items).toHaveLength(0)
+      expect(getValue(listState).items.map((item) => item.index)).toEqual([INITIAL_INDEX])
 
       return new Promise((resolve) => {
         setTimeout(() => {
@@ -155,6 +175,8 @@ describe('list engine', () => {
 
           // the UI responds by publishing back through the scrollTop stream
           publish(scrollTop, INITIAL_INDEX * SIZE)
+          // The scroller acknowledges that the initial target has been reached.
+          publish(initialItemFinalLocationReached, true)
           expect(getValue(listState).items).toHaveLength(7)
           resolve(true)
         }, 100)
@@ -285,7 +307,7 @@ describe('list engine', () => {
 
       publish(sizeRanges, [{ endIndex: INITIAL_INDEX, size: SIZE, startIndex: INITIAL_INDEX }])
 
-      expect(getValue(listState).items).toHaveLength(0)
+      expect(getValue(listState).items.map((item) => item.index)).toEqual([INITIAL_INDEX])
 
       return new Promise((resolve) => {
         setTimeout(() => {

@@ -13,42 +13,61 @@ exports[`VirtuosoMockContext > Grid > correctly renders items 1`] = `
     >
       <div
         class="virtuoso-grid-list"
+        data-recycling-grid=""
         data-testid="virtuoso-item-list"
-        style="padding-top: 0px; padding-bottom: 100px;"
+        style="position: relative; padding-top: 0px; padding-bottom: 100px;"
       >
         <div
           class="virtuoso-grid-item"
+          data-grid-visible=""
           data-index="0"
+          data-recycling-key="0"
+          data-recycling-slot="0"
         >
           Item 0
         </div>
         <div
           class="virtuoso-grid-item"
+          data-grid-visible=""
           data-index="1"
+          data-recycling-key="1"
+          data-recycling-slot="1"
         >
           Item 1
         </div>
         <div
           class="virtuoso-grid-item"
+          data-grid-visible=""
           data-index="2"
+          data-recycling-key="2"
+          data-recycling-slot="2"
         >
           Item 2
         </div>
         <div
           class="virtuoso-grid-item"
+          data-grid-visible=""
           data-index="3"
+          data-recycling-key="3"
+          data-recycling-slot="3"
         >
           Item 3
         </div>
         <div
           class="virtuoso-grid-item"
+          data-grid-visible=""
           data-index="4"
+          data-recycling-key="4"
+          data-recycling-slot="4"
         >
           Item 4
         </div>
         <div
           class="virtuoso-grid-item"
+          data-grid-visible=""
           data-index="5"
+          data-recycling-key="5"
+          data-recycling-slot="5"
         >
           Item 5
         </div>
@@ -69,42 +88,61 @@ exports[`VirtuosoMockContext > Grid > correctly renders items with useWindowScro
     >
       <div
         class="virtuoso-grid-list"
+        data-recycling-grid=""
         data-testid="virtuoso-item-list"
-        style="padding-top: 0px; padding-bottom: 100px;"
+        style="position: relative; padding-top: 0px; padding-bottom: 100px;"
       >
         <div
           class="virtuoso-grid-item"
+          data-grid-visible=""
           data-index="0"
+          data-recycling-key="0"
+          data-recycling-slot="0"
         >
           Item 0
         </div>
         <div
           class="virtuoso-grid-item"
+          data-grid-visible=""
           data-index="1"
+          data-recycling-key="1"
+          data-recycling-slot="1"
         >
           Item 1
         </div>
         <div
           class="virtuoso-grid-item"
+          data-grid-visible=""
           data-index="2"
+          data-recycling-key="2"
+          data-recycling-slot="2"
         >
           Item 2
         </div>
         <div
           class="virtuoso-grid-item"
+          data-grid-visible=""
           data-index="3"
+          data-recycling-key="3"
+          data-recycling-slot="3"
         >
           Item 3
         </div>
         <div
           class="virtuoso-grid-item"
+          data-grid-visible=""
           data-index="4"
+          data-recycling-key="4"
+          data-recycling-slot="4"
         >
           Item 4
         </div>
         <div
           class="virtuoso-grid-item"
+          data-grid-visible=""
           data-index="5"
+          data-recycling-key="5"
+          data-recycling-slot="5"
         >
           Item 5
         </div>
@@ -127,14 +165,16 @@ exports[`VirtuosoMockContext > List > correctly renders items 1`] = `
       style="height: 100%; position: absolute; top: 0px; width: 100%;"
     >
       <div
+        data-recycling-list=""
         data-testid="virtuoso-item-list"
-        style="box-sizing: border-box; margin-top: 0px; padding-top: 0px; padding-bottom: 500px;"
+        style="box-sizing: border-box; margin-top: 0px; position: relative; padding: 0px; height: 800px;"
       >
         <div
           data-index="0"
           data-item-index="0"
           data-known-size="100"
-          style="overflow-anchor: none;"
+          data-recycling-slot="0"
+          style="position: absolute; box-sizing: border-box; overflow-anchor: none; top: 0px; left: 0px; width: 100%; height: 100px;"
         >
           Item 0
         </div>
@@ -142,7 +182,8 @@ exports[`VirtuosoMockContext > List > correctly renders items 1`] = `
           data-index="1"
           data-item-index="1"
           data-known-size="100"
-          style="overflow-anchor: none;"
+          data-recycling-slot="1"
+          style="position: absolute; box-sizing: border-box; overflow-anchor: none; top: 100px; left: 0px; width: 100%; height: 100px;"
         >
           Item 1
         </div>
@@ -150,7 +191,8 @@ exports[`VirtuosoMockContext > List > correctly renders items 1`] = `
           data-index="2"
           data-item-index="2"
           data-known-size="100"
-          style="overflow-anchor: none;"
+          data-recycling-slot="2"
+          style="position: absolute; box-sizing: border-box; overflow-anchor: none; top: 200px; left: 0px; width: 100%; height: 100px;"
         >
           Item 2
         </div>

@@ -1,11 +1,13 @@
 import React from 'react'
 
-import { gridSystem } from './gridSystem'
+import { gridSystem, itemsPerRow } from './gridSystem'
 import useIsomorphicLayoutEffect from './hooks/useIsomorphicLayoutEffect'
 import useSize from './hooks/useSize'
 import useWindowViewportRectRef from './hooks/useWindowViewportRect'
 import { LogLevel } from './loggerSystem'
 import { systemToComponent } from './react-urx'
+import { useGridRecyclingBinding } from './recycling/gridBinding'
+import { RecycledGridItems } from './recycling/RecycledGridItems'
 import * as u from './urx'
 import { VirtuosoGridMockContext } from './utils/context'
 import { correctItemSize } from './utils/correctItemSize'
@@ -16,6 +18,9 @@ import type { GridComponents, GridComputeItemKey, GridItemContent, GridRootProps
 import type { Log } from './loggerSystem'
 
 const gridComponentPropsSystem = /*#__PURE__*/ u.system(() => {
+  const recycling = u.statefulStream<boolean | undefined>(undefined)
+  const getItemType = u.statefulStream<((item: any, index: number) => string | number | undefined) | undefined>(undefined)
+  const integrationFocusedKey = u.statefulStream<React.Key | null>(null)
   const itemContent = u.statefulStream<GridItemContent<any, any>>((index) => `Item ${index}`)
   const components = u.statefulStream<GridComponents>({})
   const context = u.statefulStream<unknown>(null)
@@ -43,6 +48,9 @@ const gridComponentPropsSystem = /*#__PURE__*/ u.system(() => {
 
   return {
     components,
+    recycling,
+    getItemType,
+    integrationFocusedKey,
     computeItemKey,
     context,
     FooterComponent: distinctProp('Footer'),
@@ -70,6 +78,17 @@ const combinedSystem = /*#__PURE__*/ u.system(
 
 const GridItems: React.FC = /*#__PURE__*/ React.memo(function GridItems() {
   const gridState = useEmitterValue('gridState')
+  const recycling = useEmitterValue('recycling')
+  const getItemType = useEmitterValue('getItemType')
+  const data = useEmitterValue('data')
+  const totalCount = useEmitterValue('totalCount')
+  const viewport = useEmitterValue('viewportDimensions')
+  const gap = useEmitterValue('gap')
+  const integrationFocusedKey = useEmitterValue('integrationFocusedKey')
+  const [placement, setPlacement] = React.useState({ left: 0, top: 0, reverse: false })
+  const [domFocusedKey, setDomFocusedKey] = React.useState<React.Key | null>(null)
+  const recycle = recycling !== false
+
   const listClassName = useEmitterValue('listClassName')
   const itemClassName = useEmitterValue('itemClassName')
   const itemContent = useEmitterValue('itemContent')
@@ -91,14 +110,31 @@ const GridItems: React.FC = /*#__PURE__*/ React.memo(function GridItems() {
       () => (el) => {
         const scrollHeight = el.parentElement!.parentElement!.scrollHeight
         scrollHeightCallback(scrollHeight)
-        const firstItem = el.firstChild as HTMLElement | null
-        if (firstItem !== null) {
+        // Only direct visible hosts count: a parked cell may contain another grid.
+        const firstItem = el.hasAttribute('data-recycling-grid')
+          ? (Array.from(el.children).find((child) => child.hasAttribute('data-grid-visible')) as HTMLElement | undefined)
+          : (el.firstElementChild as HTMLElement | null)
+        const css = getComputedStyle(el)
+        const columnGap = resolveGapValue('column-gap', css.columnGap, log)
+        const rowGap = resolveGapValue('row-gap', css.rowGap, log)
+        if (firstItem) {
           const { height, width } = firstItem.getBoundingClientRect()
           itemDimensions({ height, width })
+          const columns = itemsPerRow(el.clientWidth, width, columnGap)
+          const index = Number(firstItem.dataset.index ?? 0)
+          const reverse = (css.direction === 'rtl') !== (css.flexDirection === 'row-reverse')
+          const next = {
+            left: firstItem.offsetLeft - (index % columns) * (width + columnGap) * (reverse ? -1 : 1),
+            top: firstItem.offsetTop - Math.floor(index / columns) * (height + rowGap),
+            reverse,
+          }
+          setPlacement((previous) =>
+            previous.left === next.left && previous.top === next.top && previous.reverse === next.reverse ? previous : next
+          )
         }
         gridGap({
-          column: resolveGapValue('column-gap', getComputedStyle(el).columnGap, log),
-          row: resolveGapValue('row-gap', getComputedStyle(el).rowGap, log),
+          column: columnGap,
+          row: rowGap,
         })
       },
       [scrollHeightCallback, itemDimensions, gridGap, log]
@@ -123,29 +159,67 @@ const GridItems: React.FC = /*#__PURE__*/ React.memo(function GridItems() {
       ref={listRef}
       {...contextPropIfNotDomElement(ListComponent, context)}
       data-testid="virtuoso-item-list"
-      style={{ paddingBottom: gridState.offsetBottom, paddingTop: gridState.offsetTop }}
+      data-recycling-grid={recycle && !isSeeking ? '' : undefined}
+      onFocusCapture={(event: React.FocusEvent<HTMLElement>) => {
+        let node = event.target as HTMLElement | null
+        let index: number | undefined
+        while (node && node !== event.currentTarget) {
+          if (node.parentElement === event.currentTarget && node.hasAttribute('data-recycling-slot') && node.hasAttribute('data-index')) {
+            index = Number(node.dataset.index)
+          }
+          node = node.parentElement
+        }
+        if (index !== undefined) {
+          setDomFocusedKey(computeItemKey(index, data?.[index], context))
+        }
+      }}
+      onBlurCapture={(event: React.FocusEvent<HTMLElement>) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setDomFocusedKey(null)
+        }
+      }}
+      style={{ position: 'relative', paddingBottom: gridState.offsetBottom, paddingTop: gridState.offsetTop }}
     >
-      {gridState.items.map((item) => {
-        const key = computeItemKey(item.index, item.data, context)
-        return isSeeking ? (
-          <ScrollSeekPlaceholder
-            key={key}
-            {...contextPropIfNotDomElement(ScrollSeekPlaceholder, context)}
-            height={gridState.itemHeight}
-            index={item.index}
-            width={gridState.itemWidth}
-          />
-        ) : (
-          <ItemComponent
-            {...contextPropIfNotDomElement(ItemComponent, context)}
-            className={itemClassName}
-            data-index={item.index}
-            key={key}
-          >
-            {itemContent(item.index, item.data, context)}
-          </ItemComponent>
-        )
-      })}
+      {recycle && !isSeeking ? (
+        <RecycledGridItems
+          placement={placement}
+          state={gridState}
+          data={data}
+          totalCount={totalCount}
+          columns={gridState.itemWidth > 0 ? itemsPerRow(viewport.width, gridState.itemWidth, gap.column) : 1}
+          rowGap={gap.row}
+          columnGap={gap.column}
+          focusedKey={integrationFocusedKey ?? domFocusedKey}
+          computeItemKey={computeItemKey}
+          getItemType={getItemType}
+          itemContent={itemContent}
+          ItemComponent={ItemComponent}
+          className={itemClassName}
+          context={context}
+        />
+      ) : (
+        gridState.items.map((item) => {
+          const key = computeItemKey(item.index, item.data, context)
+          return isSeeking ? (
+            <ScrollSeekPlaceholder
+              key={key}
+              {...contextPropIfNotDomElement(ScrollSeekPlaceholder, context)}
+              height={gridState.itemHeight}
+              index={item.index}
+              width={gridState.itemWidth}
+            />
+          ) : (
+            <ItemComponent
+              {...contextPropIfNotDomElement(ItemComponent, context)}
+              className={itemClassName}
+              data-index={item.index}
+              key={key}
+            >
+              {itemContent(item.index, item.data, context)}
+            </ItemComponent>
+          )
+        })
+      )}
     </ListComponent>
   )
 })
@@ -273,6 +347,8 @@ const {
   combinedSystem,
   {
     optional: {
+      recycling: 'recycling',
+      getItemType: 'getItemType',
       context: 'context',
       totalCount: 'totalCount',
       overscan: 'overscan',
@@ -309,7 +385,8 @@ const {
       readyStateChanged: 'readyStateChanged',
     },
   },
-  GridRoot
+  GridRoot,
+  useGridRecyclingBinding
 )
 
 const Scroller = /*#__PURE__*/ buildScroller({ useEmitter, useEmitterValue, usePublisher })

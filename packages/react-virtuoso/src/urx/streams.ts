@@ -166,11 +166,21 @@ export function stream<T>(): Stream<T> {
 
   return ((action: PUBLISH | RESET | SUBSCRIBE, arg: any) => {
     switch (action) {
-      case PUBLISH:
-        subscriptions.slice().forEach((subscription) => {
+      case PUBLISH: {
+        if (subscriptions.length === 0) {
+          return
+        }
+        if (subscriptions.length === 1) {
+          const subscription = subscriptions[0]!
           subscription(arg as T)
-        })
+          return
+        }
+        const listeners = subscriptions.slice()
+        for (const subscription of listeners) {
+          subscription(arg as T)
+        }
         return
+      }
       case RESET:
         subscriptions.splice(0, subscriptions.length)
         return

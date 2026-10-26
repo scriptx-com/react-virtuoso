@@ -1,6 +1,7 @@
 import { arrayToRanges, empty, find, findMaxKeyValue, insert, newTree, rangesWithin, remove, walk } from './AATree'
 import { loggerSystem, LogLevel } from './loggerSystem'
 import { recalcSystem } from './recalcSystem'
+import { validateKnownLayout } from './recycling/layout'
 import * as u from './urx'
 import * as arrayBinarySearch from './utils/binaryArraySearch'
 import { correctItemSize } from './utils/correctItemSize'
@@ -8,6 +9,7 @@ import { correctItemSize } from './utils/correctItemSize'
 import type { AANode, Range } from './AATree'
 import type { SizeFunction, SizeRange } from './interfaces'
 import type { Log } from './loggerSystem'
+import type { KnownLayout } from './recycling/layout'
 
 export type Data = readonly unknown[] | undefined
 
@@ -308,10 +310,64 @@ export const sizeSystem = u.system(
     const gap = u.statefulStream(0)
     const initial = initialSizeState()
 
-    const sizes = u.statefulStreamFromEmitter(
-      u.pipe(sizeRanges, u.withLatestFrom(groupIndices, log, gap), u.scan(sizeStateReducer, initial), u.distinctUntilChanged()),
-      initial
-    )
+    const sizes = u.statefulStream(initial)
+    // Always reduce from the current tree, including explicit geometry replacement.
+    // A private scan accumulator would resurrect measurements from the old dataset.
+    u.subscribe(sizeRanges, (ranges) => {
+      const previous = u.getValue(sizes)
+      const next = sizeStateReducer(previous, [ranges, u.getValue(groupIndices), u.getValue(log), u.getValue(gap)])
+      if (next !== previous) {
+        u.publish(sizes, next)
+      }
+    })
+
+    const applyKnownLayout = u.stream<KnownLayout | undefined>()
+    const knownLayout = u.statefulStream<KnownLayout | undefined>(undefined)
+    const beforeKnownLayoutChange = u.stream<void>()
+    const afterKnownLayoutChange = u.stream<void>()
+    const knownLayoutChanging = u.statefulStream(false)
+    const geometryRevision = u.statefulStream(0)
+    let geometryManaged = false
+    let lastLayoutInput: KnownLayout | undefined
+
+    function replaceGeometry(input: KnownLayout | undefined) {
+      const layout =
+        input && validateKnownLayout(input, u.getValue(statefulTotalCount)) && u.getValue(groupIndices).length === 0
+          ? { revision: input.revision, ranges: input.ranges.map((range) => ({ ...range })) }
+          : undefined
+      u.publish(knownLayoutChanging, true)
+      u.publish(geometryRevision, u.getValue(geometryRevision) + 1)
+      u.publish(beforeKnownLayoutChange, undefined)
+      u.publish(knownLayout, layout)
+      const fallback = u.getValue(defaultItemSize) ?? u.getValue(sizes).lastSize
+      const ranges = Number.isFinite(fallback) && fallback > 0 ? [{ startIndex: 0, endIndex: 0, size: fallback }] : []
+      if (layout) {
+        ranges.push(...layout.ranges)
+      }
+      u.publish(sizes, sizeStateReducer(initialSizeState(), [ranges, [], u.getValue(log), u.getValue(gap)]))
+      // Notify existing refresh/anchor correction subscribers using the same channel.
+      u.publish(sizeRanges, [])
+      u.publish(afterKnownLayoutChange, undefined)
+      u.publish(knownLayoutChanging, false)
+    }
+
+    u.subscribe(applyKnownLayout, (layout) => {
+      if (geometryManaged && lastLayoutInput === layout) {
+        return
+      }
+      geometryManaged = true
+      lastLayoutInput = layout
+      replaceGeometry(layout)
+    })
+    const invalidateGeometry = () => {
+      if (!geometryManaged) {
+        return
+      }
+      lastLayoutInput = undefined
+      replaceGeometry(undefined)
+    }
+    u.subscribe(u.duc(data), invalidateGeometry)
+    u.subscribe(u.duc(totalCount), invalidateGeometry)
 
     const prevGroupIndices = u.statefulStreamFromEmitter(
       u.pipe(
@@ -699,6 +755,12 @@ export const sizeSystem = u.system(
     )
 
     return {
+      applyKnownLayout,
+      knownLayout,
+      beforeKnownLayoutChange,
+      afterKnownLayoutChange,
+      knownLayoutChanging,
+      geometryRevision,
       beforeUnshiftWith,
       // input
       data,

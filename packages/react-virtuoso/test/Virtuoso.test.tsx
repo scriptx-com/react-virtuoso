@@ -31,21 +31,19 @@ describe('Virtuoso', () => {
 
     const scroller = container.firstElementChild as any
     const viewport = scroller.firstElementChild
-    const listParent = viewport.firstElementChild
 
     act(() => {
       scroller.triggerScroll({ scrollHeight: 700, scrollTop: 0, viewportHeight: 200 })
       viewport.triggerResize({ getBoundingClientRect: () => ({ height: 700 }) })
     })
 
-    expect(listParent.children).toHaveLength(1)
-    expect(listParent.textContent).toBe('Item 0')
+    expect(viewport.firstElementChild.children).toHaveLength(1)
+    expect(viewport.firstElementChild.textContent).toBe('Item 0')
   })
 
   describe('rendered list', () => {
     let scroller: any
     let viewport: any
-    let listParent: any
 
     beforeEach(() => {
       act(() => {
@@ -54,39 +52,37 @@ describe('Virtuoso', () => {
 
       scroller = container.firstElementChild
       viewport = scroller.firstElementChild
-      listParent = viewport.firstElementChild
 
       act(() => {
         scroller.triggerScroll({ scrollHeight: 700, scrollTop: 0, viewportHeight: 200 })
         viewport.triggerResize({ getBoundingClientRect: () => ({ height: 700 }) })
-        listParent.triggerChangedChildSizes([{ endIndex: 0, size: 30, startIndex: 0 }])
+        viewport.firstElementChild.triggerChangedChildSizes([{ endIndex: 0, size: 30, startIndex: 0 }])
       })
     })
 
     it('renders the list as soon as the viewport dimensions are clear', () => {
-      expect(listParent.children).toHaveLength(24)
+      expect(viewport.firstElementChild.children).toHaveLength(24)
     })
 
     it('changes the list if items resize', () => {
       act(() => {
-        listParent.triggerChangedChildSizes([{ endIndex: 12, size: 50, startIndex: 10 }])
+        viewport.firstElementChild.triggerChangedChildSizes([{ endIndex: 12, size: 50, startIndex: 10 }])
       })
 
-      expect(listParent.children).toHaveLength(22)
+      expect(viewport.firstElementChild.querySelectorAll('[data-index]')).toHaveLength(22)
     })
 
     it('renders new items when scrolling', () => {
       act(() => {
         scroller.triggerScroll({ scrollHeight: 1000, scrollTop: 600, viewportHeight: 200 })
       })
-      expect(listParent.firstElementChild.dataset.index).toBe('20')
+      expect(viewport.firstElementChild.firstElementChild.dataset.index).toBe('20')
     })
   })
 
   describe('data list', () => {
     let scroller: any
     let viewport: any
-    let listParent: any
     const data: any = Array.from({ length: 1000 }).map((_, i) => `Item ${i}`)
 
     beforeEach(() => {
@@ -96,17 +92,16 @@ describe('Virtuoso', () => {
 
       scroller = container.firstElementChild
       viewport = scroller.firstElementChild
-      listParent = viewport.firstElementChild
 
       act(() => {
         scroller.triggerScroll({ scrollHeight: 700, scrollTop: 0, viewportHeight: 200 })
         viewport.triggerResize({ getBoundingClientRect: () => ({ height: 700 }) })
-        listParent.triggerChangedChildSizes([{ endIndex: 0, size: 10, startIndex: 0 }])
+        viewport.firstElementChild.triggerChangedChildSizes([{ endIndex: 0, size: 10, startIndex: 0 }])
       })
     })
 
     it('renders the list with the data item', () => {
-      expect(listParent.firstElementChild.textContent).toBe('Item 0')
+      expect(viewport.firstElementChild.firstElementChild.textContent).toBe('Item 0')
     })
   })
 
@@ -134,16 +129,15 @@ describe('Virtuoso', () => {
 
     const scroller = container.firstElementChild as any
     const viewport = scroller.firstElementChild
-    const listParent = viewport.firstElementChild
 
     act(() => {
       scroller.triggerScroll({ scrollHeight: 700, scrollTop: 0, viewportHeight: 200 })
       viewport.triggerResize({ getBoundingClientRect: () => ({ height: 100 }) })
-      listParent.triggerChangedChildSizes([{ endIndex: 0, size: 10, startIndex: 0 }])
+      viewport.firstElementChild.triggerChangedChildSizes([{ endIndex: 0, size: 10, startIndex: 0 }])
       container.querySelector('button')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(listParent.firstElementChild.textContent).toBe('Item 0')
+    expect(viewport.firstElementChild.firstElementChild.textContent).toBe('Item 0')
   })
 
   it('updates when data is propagated (same length)', () => {
@@ -175,16 +169,15 @@ describe('Virtuoso', () => {
 
     const scroller = container.firstElementChild as any
     const viewport = scroller.firstElementChild
-    const listParent = viewport.firstElementChild
 
     act(() => {
       scroller.triggerScroll({ scrollHeight: 700, scrollTop: 0, viewportHeight: 200 })
       viewport.triggerResize({ getBoundingClientRect: () => ({ height: 100 }) })
-      listParent.triggerChangedChildSizes([{ endIndex: 0, size: 10, startIndex: 0 }])
+      viewport.firstElementChild.triggerChangedChildSizes([{ endIndex: 0, size: 10, startIndex: 0 }])
       container.querySelector('button')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
-    expect(listParent.firstElementChild.textContent).toBe('Item 1')
+    expect(viewport.firstElementChild.firstElementChild.textContent).toBe('Item 1')
   })
 
   it('updates when data is propagated (reduced length)', () => {
@@ -220,27 +213,16 @@ describe('Virtuoso', () => {
 
     const scroller = container.firstElementChild as any
     const viewport = scroller.firstElementChild
-    const listParent = viewport.firstElementChild
 
     act(() => {
       scroller.triggerScroll({ scrollHeight: 700, scrollTop: 0, viewportHeight: 200 })
       viewport.triggerResize({ getBoundingClientRect: () => ({ height: 100 }) })
-      listParent.triggerChangedChildSizes([{ endIndex: 0, size: 10, startIndex: 0 }])
+      viewport.firstElementChild.triggerChangedChildSizes([{ endIndex: 0, size: 10, startIndex: 0 }])
     })
 
-    expect(itemsRendered).toHaveBeenCalledTimes(2)
+    // The unchanged zero-size probe is not emitted again when viewport size arrives.
+    expect(itemsRendered).toHaveBeenCalledTimes(1)
     expect(itemsRendered).toHaveBeenNthCalledWith(1, [
-      {
-        data: {
-          name: 'Item 0',
-        },
-        index: 0,
-        offset: 0,
-        originalIndex: 0,
-        size: 0,
-      },
-    ])
-    expect(itemsRendered).toHaveBeenNthCalledWith(2, [
       {
         data: {
           name: 'Item 0',
@@ -279,6 +261,6 @@ describe('Virtuoso', () => {
       },
     ])
 
-    expect(listParent.firstElementChild.textContent).toBe('Item 1')
+    expect(viewport.firstElementChild.firstElementChild.textContent).toBe('Item 1')
   })
 })

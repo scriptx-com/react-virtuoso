@@ -54,11 +54,16 @@ test.describe('scroll to index', () => {
 
     await page.waitForTimeout(100)
 
-    const scrollTop = await page.evaluate(() => {
-      return document.querySelector('[data-testid=virtuoso-scroller]')!.scrollTop
-    })
-
-    const rendered30s = 14
-    expect(scrollTop).toBe((99 - rendered30s) * 20 + rendered30s * 30 - 300 + 30)
+    // Different measurement schedules may refine different offscreen estimates.
+    // Assert the requested endpoint, independent of that historical size tree.
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const scroller = document.querySelector('[data-testid=virtuoso-scroller]')!
+          const last = document.querySelector('[data-item-index="99"]')
+          return last ? Math.abs(last.getBoundingClientRect().bottom - scroller.getBoundingClientRect().bottom) : Infinity
+        })
+      )
+      .toBeLessThanOrEqual(1)
   })
 })

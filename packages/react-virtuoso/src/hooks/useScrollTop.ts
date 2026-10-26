@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom'
 
+import { useRecyclingActivity } from '../recycling/RecyclingContext'
 import * as u from '../urx'
 import { approximatelyEqual } from '../utils/approximatelyEqual'
 import { correctItemSize } from '../utils/correctItemSize'
@@ -24,10 +25,14 @@ export default function useScrollTop(
   scrollerElement: any,
   scrollerRefCallback: (ref: ScrollerRef) => void = u.noop,
   customScrollParent?: HTMLElement,
-  horizontalDirection?: boolean
+  horizontalDirection?: boolean,
+  initialGeometryReady = false
 ) {
+  const active = useRecyclingActivity()
+  const initialized = React.useRef(false)
   const scrollerRef = React.useRef<HTMLElement | null | Window>(null)
   const scrollTopTarget = React.useRef<any>(null)
+  const extentRetryFrame = React.useRef<number | undefined>(undefined)
   const timeoutRef = React.useRef<null | ReturnType<typeof setTimeout>>(null)
 
   const handler = React.useCallback(
@@ -82,21 +87,43 @@ export default function useScrollTop(
   )
 
   React.useEffect(() => {
+    if (!active) {
+      return
+    }
     const localRef = customScrollParent ? customScrollParent : scrollerRef.current!
 
     clearHorizontalScrollDirectionCache(localRef)
     scrollerRefCallback(customScrollParent ? customScrollParent : scrollerRef.current)
-    handler({ suppressFlushSync: true, target: localRef } as unknown as Event)
+    if (!initialGeometryReady || initialized.current) {
+      handler({ suppressFlushSync: true, target: localRef } as unknown as Event)
+    }
+    initialized.current = true
     localRef.addEventListener('scroll', handler, { passive: true })
 
     return () => {
       clearHorizontalScrollDirectionCache(localRef)
       scrollerRefCallback(null)
       localRef.removeEventListener('scroll', handler)
+      if (extentRetryFrame.current !== undefined) {
+        cancelAnimationFrame(extentRetryFrame.current)
+        extentRetryFrame.current = undefined
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      timeoutRef.current = null
+      scrollTopTarget.current = null
     }
-  }, [scrollerRef, handler, scrollerElement, scrollerRefCallback, customScrollParent])
+  }, [scrollerRef, handler, scrollerElement, scrollerRefCallback, customScrollParent, initialGeometryReady, active])
 
-  function scrollToCallback(location: ScrollToOptions) {
+  function scrollToCallback(location: ScrollToOptions, retryAfterCommit = true) {
+    if (extentRetryFrame.current !== undefined) {
+      cancelAnimationFrame(extentRetryFrame.current)
+      extentRetryFrame.current = undefined
+    }
+    if (!active) {
+      return
+    }
     const scrollerElement = scrollerRef.current
     if (
       !scrollerElement ||
@@ -136,6 +163,15 @@ export default function useScrollTop(
       return
     }
 
+    // An absolute list's new extent commits after its measurement publication.
+    // Recheck a clamped request once after that commit; a newer request wins.
+    if (retryAfterCommit && location.top > maxScrollTop) {
+      const requested = { ...location }
+      extentRetryFrame.current = requestAnimationFrame(() => {
+        extentRetryFrame.current = undefined
+        scrollToCallback(requested, false)
+      })
+    }
     const top = Math.ceil(Math.max(Math.min(maxScrollTop, location.top), 0))
     location.top = top
 
@@ -176,6 +212,9 @@ export default function useScrollTop(
   }
 
   function scrollByCallback(location: ScrollToOptions) {
+    if (!active) {
+      return
+    }
     if (horizontalDirection === true) {
       location = {
         ...(location.behavior !== undefined ? { behavior: location.behavior } : {}),

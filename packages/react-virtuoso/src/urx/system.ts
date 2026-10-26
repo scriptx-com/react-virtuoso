@@ -198,18 +198,41 @@ const id = () => Symbol() as unknown as string
  * @returns the [[System]] constructed by the spec constructor.
  * @param systemSpec the system spec to initialize.
  */
-export function init<SS extends AnySystemSpec>(systemSpec: SS): SR<SS> {
-  const singletons = new Map<string, System>()
+interface ConstructionStep {
+  build: AnySystemSpec['constructor']
+  dependencies: number[]
+}
+const systemPlans = new WeakMap<AnySystemSpec, ConstructionStep[]>()
 
-  const _init = <SS extends AnySystemSpec>({ constructor, dependencies, id, singleton }: SS) => {
-    if (singleton && singletons.has(id)) {
-      return singletons.get(id)! as SR<SS>
+export function init<SS extends AnySystemSpec>(systemSpec: SS): SR<SS> {
+  let plan = systemPlans.get(systemSpec)
+  if (!plan) {
+    const steps: ConstructionStep[] = []
+    const singletons = new Map<string, number>()
+    const visit = (definition: AnySystemSpec): number => {
+      if (definition.singleton && singletons.has(definition.id)) {
+        return singletons.get(definition.id)!
+      }
+      const dependencies = definition.dependencies.map(visit)
+      const index = steps.length
+      steps.push({ build: definition.constructor, dependencies })
+      if (definition.singleton) {
+        singletons.set(definition.id, index)
+      }
+      return index
     }
-    const system = constructor(dependencies.map((e: AnySystemSpec) => _init(e)))
-    if (singleton) {
-      singletons.set(id, system)
-    }
-    return system
+    visit(systemSpec)
+    plan = steps
+    systemPlans.set(systemSpec, plan)
   }
-  return _init(systemSpec)
+  const values: System[] = new Array(plan.length)
+  for (let index = 0; index < plan.length; index++) {
+    const { build, dependencies } = plan[index]!
+    const args: System[] = new Array(dependencies.length)
+    for (let offset = 0; offset < dependencies.length; offset++) {
+      args[offset] = values[dependencies[offset]!]!
+    }
+    values[index] = build(args)
+  }
+  return values[values.length - 1] as SR<SS>
 }
