@@ -188,7 +188,7 @@ const Items = /*#__PURE__*/ React.memo(function VirtuosoItems({ showTopList = fa
       console.warn('Virtuoso recycling is unavailable for this list configuration; using ordinary virtualization.')
     }
   }, [recycling, supportsRecycling, showTopList])
-  const recycle = recycling !== false && supportsRecycling && sizes.offsetTree.length > 0
+  const recycle = recycling !== false && supportsRecycling
   const [rtl, setRtl] = React.useState(false)
   const sizeRanges = usePublisher('sizeRanges')
   const windowScrollContainerStateCallback = usePublisher('windowScrollContainerState')

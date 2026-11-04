@@ -8,7 +8,8 @@ Use stable `computeItemKey` values when data can move or be replaced.
 For `Virtuoso` lists, grouped/top-item, inverse, bottom-aligned, follow-output, scroll-seek, window and
 custom-scroll-parent modes retain ordinary virtualization. Explicitly requesting
 recycling in these modes produces one development warning. Unknown initial
-geometry and SSR use natural flow until the first offsets are available.
+geometry and SSR render the same recycled cells in natural flow until the first
+offsets are available, so cells mounted before measurement are not mounted again.
 
 ## Item lifecycle
 

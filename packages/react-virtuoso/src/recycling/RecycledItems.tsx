@@ -56,12 +56,18 @@ interface CellProps extends CellRecord {
   horizontal: boolean
   rtl: boolean
   exact: boolean
+  /** No offsets are measured yet, so the cell sits in natural flow like an ordinary item. */
+  flow: boolean
+  /** The focused cell kept mounted outside the rendered items. */
+  retained: boolean
   firstItemIndex: number
   itemContent: Props['itemContent']
   ItemComponent: Props['ItemComponent']
   context: any
   register: (slotId: number, element: HTMLElement | null) => void
 }
+
+const UNMEASURED_STYLE = { opacity: 0, pointerEvents: 'none' } as const
 
 const Cell = React.memo(function RecycledCell({
   slot,
@@ -70,6 +76,8 @@ const Cell = React.memo(function RecycledCell({
   horizontal,
   rtl,
   exact,
+  flow,
+  retained,
   firstItemIndex,
   itemContent,
   ItemComponent,
@@ -97,15 +105,24 @@ const Cell = React.memo(function RecycledCell({
     () => itemContent(index + firstItemIndex, data, context),
     [itemContent, index, firstItemIndex, data, context]
   )
+  const placement: React.CSSProperties = flow
+    ? retained
+      ? { position: 'absolute', ...UNMEASURED_STYLE }
+      : horizontal
+        ? { display: 'inline-block', height: '100%' }
+        : {}
+    : {
+        position: 'absolute',
+        ...(horizontal
+          ? { top: 0, height: '100%', display: 'inline-block', [rtl ? 'right' : 'left']: offset, ...(exact ? { width: size } : {}) }
+          : { top: offset, left: 0, width: '100%', ...(exact ? { height: size } : {}) }),
+        // Virtuoso's bootstrap items share offset zero until their first measurement.
+        ...(!(size > 0) ? UNMEASURED_STYLE : {}),
+      }
   const style: React.CSSProperties = {
-    position: 'absolute',
     boxSizing: 'border-box',
     overflowAnchor: 'none',
-    ...(horizontal
-      ? { top: 0, height: '100%', display: 'inline-block', [rtl ? 'right' : 'left']: offset, ...(exact ? { width: size } : {}) }
-      : { top: offset, left: 0, width: '100%', ...(exact ? { height: size } : {}) }),
-    // Virtuoso's bootstrap items share offset zero until their first measurement.
-    ...(!(size > 0) ? { opacity: 0, pointerEvents: 'none' as const } : {}),
+    ...placement,
     ...(!active ? { display: 'none' } : {}),
   }
   return (
@@ -215,6 +232,7 @@ export function RecycledItems(props: Props) {
       records.set(slot.slotId, record)
     }
   }
+  const retainedKey = focusedKey !== null && !required.some((item) => item.key === focusedKey) ? focusedKey : null
   useIsomorphicLayoutEffect(() => {
     committed.pool = pool
     committed.records = records
@@ -287,23 +305,26 @@ export function RecycledItems(props: Props) {
       onFocusedItem(null)
     }
   }
-  const style: React.CSSProperties = {
-    ...listStyle,
-    position: 'relative',
-    boxSizing: 'border-box',
-    paddingTop: 0,
-    paddingBottom: 0,
-    paddingLeft: 0,
-    paddingRight: 0,
-    ...(horizontal
-      ? {
-          display: 'inline-block',
-          width: totalSize + (props.contentInsets?.start ?? 0) + (props.contentInsets?.end ?? 0),
-          height: '100%',
-          whiteSpace: 'nowrap',
-        }
-      : { height: totalSize + (props.contentInsets?.start ?? 0) + (props.contentInsets?.end ?? 0) }),
-  }
+  const flow = sizes.offsetTree.length === 0
+  const style: React.CSSProperties | undefined = flow
+    ? listStyle
+    : {
+        ...listStyle,
+        position: 'relative',
+        boxSizing: 'border-box',
+        paddingTop: 0,
+        paddingBottom: 0,
+        paddingLeft: 0,
+        paddingRight: 0,
+        ...(horizontal
+          ? {
+              display: 'inline-block',
+              width: totalSize + (props.contentInsets?.start ?? 0) + (props.contentInsets?.end ?? 0),
+              height: '100%',
+              whiteSpace: 'nowrap',
+            }
+          : { height: totalSize + (props.contentInsets?.start ?? 0) + (props.contentInsets?.end ?? 0) }),
+      }
   // Keep parked hosts at their logical position too. Moving them to the end makes React
   // relocate still-visible siblings when they return, resetting nested DOM scroll offsets.
   // Hidden hosts do not affect accessible reading order.
@@ -329,6 +350,8 @@ export function RecycledItems(props: Props) {
             horizontal={horizontal}
             rtl={rtl}
             exact={fixedItemSize !== undefined || knownSizeAt(knownLayout, record.index) !== undefined}
+            flow={flow}
+            retained={slot.key === retainedKey}
             firstItemIndex={rendering.firstItemIndex}
             itemContent={rendering.itemContent}
             ItemComponent={rendering.ItemComponent}

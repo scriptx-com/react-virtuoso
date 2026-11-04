@@ -112,3 +112,22 @@ it('keeps unmeasured SSR content in natural flow until offsets are available', (
     expect(item.style.position).not.toBe('absolute')
   }
 })
+
+const itemMounts = vi.fn()
+function Row({ id }: { id: number }) {
+  React.useEffect(() => {
+    itemMounts(id)
+  }, [id])
+  return <div>{id}</div>
+}
+
+it('keeps bootstrap cells mounted when their first measurement arrives', () => {
+  itemMounts.mockClear()
+  const view = render(<Virtuoso data={data} initialItemCount={3} itemContent={(_index, item) => <Row id={item} />} />, {
+    wrapper: mock,
+  })
+  const cells = [...view.container.querySelectorAll<HTMLElement>('[data-recycling-slot]')]
+  expect(cells).toHaveLength(3)
+  expect(cells.map((cell) => cell.style.position)).toEqual(['absolute', 'absolute', 'absolute'])
+  expect(itemMounts.mock.calls).toEqual([[0], [1], [2]])
+})
